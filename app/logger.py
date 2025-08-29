@@ -26,6 +26,7 @@ def build_logger(appName: str) -> logging.Logger:
     log_path = f"../log/"
     os.makedirs(log_path, exist_ok=True)
     log_fileName = f"{appName}.log"
+    log_fileName = f"{log_path}{log_fileName}"
 
     handler = RotatingFileHandler(
         log_fileName,
@@ -34,11 +35,11 @@ def build_logger(appName: str) -> logging.Logger:
         encoding="utf-8"
     )    
 
-    logfilename = f"{log_path}{log_fileName}"
+
 
     log.setLevel(logging.DEBUG)
 
-    fh = logging.FileHandler(logfilename, mode="a", encoding="utf-8")
+    fh = logging.FileHandler(log_fileName, mode="a", encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
