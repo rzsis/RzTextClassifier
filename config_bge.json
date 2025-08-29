@@ -1,0 +1,10 @@
+{
+    "model_path": "../modelos/bge-m3",
+    "dataset_path": "../data",
+    "output_dir": "../data/tokenizeddataset",
+    "finetuned_path": "../finetuned",
+    "itenslimit": 110,
+    "max_length": 1024,
+    "max_slide_windows":0
+
+}
