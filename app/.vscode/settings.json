@@ -1,0 +1,17 @@
+{
+  "python.defaultInterpreterPath": "/home/rz/venv3_11_12/bin/python3.11",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  "python.analysis.indexing": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.completeFunctionParens": true,
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "typeCheckingMode": "basic",  // ou "off"    
+    "reportArgumentType": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportGeneralTypeIssues": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportUnknownMemberType": "none"
+  }
+}

@@ -1,25 +1,28 @@
-import os
-from fastapi import FastAPI, HTTPException
-from dotenv import load_dotenv
-from fastapi.responses import JSONResponse
-import endpoints
+# main.py (corrigido)
+from fastapi import FastAPI
+import controllers.textController as textController
+import localconfig
+import common
+import logger
 
-# Carregar variáveis de ambiente
-load_dotenv('sqlserverrestore.env')
+appName = "RzTextClassifier"
+# 1) Instala os hooks globais o quanto antes
+logger.setup_global_exception_logging()  # sem app, já cobre sys/threading/asyncio
+
+#Configura o logger
+logger.build_logger(appName)
+
+# Inicializa arquivo de configuração
+localconfig.load_config(appName)
+
+# 3) Cria o app e registra handlers do FastAPI
 fastApi = FastAPI()
+logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers do FastAPI
 
+fastApi.include_router(textController.router)
 
-# Dados do .env
-DB_SERVER = os.getenv("DATABASE_SERVER")
-DB_USERNAME = os.getenv("DATABASE_USERNAME")
-DB_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DB_PORT = os.getenv("DATABASE_PORT")
-HTTP_PORT = int(os.getenv("HTTP_PORT", 8000))
-ENDPOINT_PASSWORD = os.getenv("ENDPOINT_PASSWORD")
-
-    
-# Iniciar o servidor FastAPI
 if __name__ == "__main__":
     import uvicorn
-    fastApi.include_router(endpoints.router)
-    uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT)
+    cfg = localconfig.read_config()
+    HTTP_PORT = int(cfg["HTTP_PORT"])
+    uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")
