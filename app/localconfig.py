@@ -30,7 +30,7 @@ def checkRequiredKeys():
         "model_path",
         "output_dir",
         "finetuned_path",
-        "HTTP_PORT",
+        "http_port",
         "dataset_path",
         "itenslimit",
         "max_length",

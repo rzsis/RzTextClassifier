@@ -4,7 +4,6 @@ from pydantic import BaseModel
 import time
 from typing import Optional
 from fastapi.responses import JSONResponse
-import main
 import common
 from fastapi import APIRouter
 

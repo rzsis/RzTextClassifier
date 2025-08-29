@@ -24,5 +24,5 @@ fastApi.include_router(textController.router)
 if __name__ == "__main__":
     import uvicorn
     cfg = localconfig.read_config()
-    HTTP_PORT = int(cfg["HTTP_PORT"])
+    HTTP_PORT = int(cfg["http_port"])
     uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")
