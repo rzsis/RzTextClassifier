@@ -18,6 +18,27 @@ class Embenddings:
         self.localconfig = localcfg
         
 
+    # Função para gerar embedding para comparação do texto
+    def generate_embedding(self, text: str) -> np.ndarray:
+        try:
+            inputs = self.tokenizer(
+                text,
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_length,
+                padding=True
+            ).to(self.model.device)
+            
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            
+            # Liberar tensores intermediários
+            del inputs, outputs
+            return embedding
+        except Exception as e:
+            raise RuntimeError(f"Erro ao gerar embedding: {e}")            
+
     def load_model_and_embendings(self):      
         print_with_time(f"Inicializando modelos e embeddings...")
         # Carregar tokenizer e modelo para gerar novos embeddings caso necessario
@@ -26,9 +47,12 @@ class Embenddings:
             if (os.path.exists(model_path) == False):
                 raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")
                 exit(1)                 
-            tokenizer = AutoTokenizer.from_pretrained(model_path)
-            model = AutoModel.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
-            model.eval()
+
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self.model = AutoModel.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
+            self.model.eval()
+            self.max_length = self.localconfig.read_config().get("max_length")
+
             print_with_time(f"Modelo e tokenizer carregados de {model_path}")
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")
@@ -50,9 +74,30 @@ class Embenddings:
             raise RuntimeError(f"Erro ao carregar embeddings ou metadados para {embeddings_file.stem}: {e}")
             exit(1)
 
-    def classifica_texto(self, strTexto: str):
+    #normaliza os embeddings para poder comparar
+    def normalize_embeddings(self, embeddings: np.ndarray, texto:str) -> np.ndarray:
         try:
-            return 
+            # Verificar se há NaN ou Inf nos embeddings
+            if np.any(np.isnan(embeddings)) or np.any(np.isinf(embeddings)):
+                raise RuntimeError(f"Erro: Embedding inválido (NaN ou Inf) para {texto}")
+                    
+            #Normalizar embedding de consulta
+            embeddings = embeddings.astype('float32')
+            faiss.normalize_L2(embeddings)
+            if  torch.cuda.is_available():        
+                torch.cuda.empty_cache()                        
+        except Exception as e:
+            raise RuntimeError(f"Erro: Embedding inválido (NaN ou Inf) para {texto} {e}")                        
+        
+
+    def classifica_texto(self, texto: str):
+        try:
+            generate_embedding = self.generate_embedding(texto)
+            self.normalize_embeddings(generate_embedding,texto)    
+
+
+
+            return generate_embedding.tolist()
         
         except Exception as e:
             raise RuntimeError(f"Erro ao classificar texto: {e}")

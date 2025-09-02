@@ -1,5 +1,8 @@
 app/__pycache__/
-app/controllers/__pycache__
+app/controllers/__pycache__/
 log/
 modelos/
 embendingDatabase/
+app/bll/__pycache__/
+app/bll/__pycache__/embeddings.cpython-311.pyc
+__pycache__/

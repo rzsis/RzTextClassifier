@@ -11,12 +11,12 @@ router = APIRouter()
 
 #endpoint para classificação de texto
 @router.post("/classificaTexto")
-async def ClassificaTexto(strTexto: str):    
+async def ClassificaTexto(texto: str):    
     # Executar script de restauração
     from main import embeddings
 
     try:
-        return embeddings.classifica_texto(strTexto)
+        return embeddings.classifica_texto(texto)
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
     
