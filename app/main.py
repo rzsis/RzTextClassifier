@@ -1,9 +1,12 @@
 # main.py (corrigido)
+from operator import index
 from fastapi import FastAPI
 import controllers.textController as textController
+import controllers.index as index
 import localconfig
 import common
 import logger
+import db_utils
 
 appName = "RzTextClassifier"
 # 1) Instala os hooks globais o quanto antes
@@ -20,9 +23,15 @@ fastApi = FastAPI()
 logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers do FastAPI
 
 fastApi.include_router(textController.router)
+fastApi.include_router(index.router)
+
 
 if __name__ == "__main__":
     import uvicorn
-    cfg = localconfig.read_config()
-    HTTP_PORT = int(cfg["http_port"])
+    
+
+    HTTP_PORT = int(localconfig.read_config().get("http_port"))
+    db_utils.Db(localconfig)  # tenta conectar com o banco de dados
+
+    common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
     uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")

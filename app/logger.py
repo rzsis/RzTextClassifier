@@ -71,6 +71,13 @@ def _getDateTimeStr() -> str:
     return f"{datetime.now():%Y-%m-%d %H:%M:%S}"
 
 
+def info(txt: str):
+    log.info(f"{_getDateTimeStr()} {txt}")
+
+def error(txt: str):
+    log.error(f"{_getDateTimeStr()} {txt}")
+
+
 # -----------------------------
 # Hooks globais de exceção
 # -----------------------------
