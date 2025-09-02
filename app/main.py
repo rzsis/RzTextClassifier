@@ -7,7 +7,7 @@ import localconfig
 import common
 import logger
 import db_utils
-import bll.modelos as modelos
+import bll.embeddings as bllEmbeddings
 
 appName = "RzTextClassifier"
 # 1) Instala os hooks globais o quanto antes
@@ -23,20 +23,20 @@ localconfig.load_config(appName)
 fastApi = FastAPI()
 logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers do FastAPI
 
+# 4) Registra os controllers (APIRouter)
 fastApi.include_router(textController.router)
 fastApi.include_router(indexController.router)
+
+db_utils.Db(localconfig)  # tenta conectar com o banco de dados
+
+embeddings = bllEmbeddings.Embenddings(localconfig)  # inicializa modelos (carrega embeddings)
+embeddings.load_model_and_embendings()
 
 
 if __name__ == "__main__":
     import uvicorn
-
     HTTP_PORT = int(localconfig.read_config().get("http_port"))
-    db_utils.Db(localconfig)  # tenta conectar com o banco de dados
-
-    modelo = modelos.Modelos(localconfig)  # inicializa modelos (carrega embeddings)
-    modelo.load_model_and_embendings()
-
-    
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
+    
     uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")
 

@@ -13,12 +13,13 @@ import csv
 import localconfig
 
 
-class Modelos:
+class Embenddings:
     def __init__(self,localcfg:localconfig):
         self.localconfig = localcfg
         
 
     def load_model_and_embendings(self):      
+        print_with_time(f"Inicializando modelos e embeddings...")
         # Carregar tokenizer e modelo para gerar novos embeddings caso necessario
         try:
             model_path = self.localconfig.getModelPath()
@@ -49,4 +50,9 @@ class Modelos:
             raise RuntimeError(f"Erro ao carregar embeddings ou metadados para {embeddings_file.stem}: {e}")
             exit(1)
 
-
+    def classifica_texto(self, strTexto: str):
+        try:
+            return 
+        
+        except Exception as e:
+            raise RuntimeError(f"Erro ao classificar texto: {e}")

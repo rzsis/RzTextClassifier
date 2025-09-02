@@ -12,7 +12,8 @@ class Db:
         host: str = localcfg.get_db_server()
         porta: int = localcfg.get_db_port()
         banco: str = localcfg.get_db_name()        
-
+        print_with_time(f"Inicializando conexão com banco de dados {host}:{porta}/{banco}..."
+                        )
         self.session = None
         self.engine = None
         self._SessionFactory = None

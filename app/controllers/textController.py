@@ -9,13 +9,15 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-#endpoint para listar todos os bancos de dados
-@router.post("/ClassificaTexto")
-async def ClassificaTexto():    
+#endpoint para classificação de texto
+@router.post("/classificaTexto")
+async def ClassificaTexto(strTexto: str):    
     # Executar script de restauração
+    from main import embeddings
+
     try:
-        return ""
+        return embeddings.classifica_texto(strTexto)
     except Exception as e:
-        return HTTPException(status_code=500, detail=f"Erro em getdatabaselist : {str(e)}")
+        return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
     
 
