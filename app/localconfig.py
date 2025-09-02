@@ -28,8 +28,8 @@ def checkRequiredKeys():
     required_keys = [
         "DataBaseConnectString",
         "model_path",
-        "output_dir",
-        "finetuned_path",
+        
+        "embendingPath",
         "http_port",
         "dataset_path",
         "itenslimit",
@@ -73,8 +73,10 @@ def getModelName() -> str:
     model_path = Path(__configReaded["model_path"])
     return model_path.name
 
-def getTokenizedPath() -> str:
-    return os.path.join(__configReaded["output_dir"], getModelName())
+def getModelPath() -> str:
+    model_path = Path(__configReaded["model_path"])
+    return model_path
 
-def getFineTunedPath() -> str:
-    return os.path.join(__configReaded["finetuned_path"], getModelName())
+def getEmbendingPath() -> str:
+    return os.path.join(__configReaded["embendingPath"], getModelName())
+

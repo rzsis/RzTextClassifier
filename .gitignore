@@ -1,3 +1,5 @@
 app/__pycache__/
 app/controllers/__pycache__
 log/
+modelos/
+embendingDatabase/
