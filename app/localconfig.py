@@ -32,7 +32,7 @@ def checkRequiredKeys():
         "embendingPath",
         "http_port",
         "dataset_path",
-        "itenslimit",
+        "batch_size",
         "max_length",
     ]
 

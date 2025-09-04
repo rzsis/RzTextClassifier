@@ -19,9 +19,9 @@ class IdsDuplicados:
             cod_classe (int): The CodClasse associated with the text.
         """
         try:
-            session = self.db.get_session()
+            session = self.db
             query = """
-                INSERT INTO idsduplicados (Id, CodClasse)
+                INSERT ignore INTO  idsduplicados (Id, CodClasse)
                 SELECT t.Id, :cod_classe
                 FROM textos_treinamento t
                 WHERE t.TxtTreinamento = :texto
@@ -38,5 +38,4 @@ class IdsDuplicados:
             self.logger.error(f"Error inserting duplicate text (ID: {id}): {e}")
             print_error(f"Error inserting duplicate text (ID: {id}): {e}")
             session.rollback()
-        finally:
-            session.close()
+        

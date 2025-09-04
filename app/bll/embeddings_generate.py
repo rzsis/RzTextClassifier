@@ -2,18 +2,18 @@
 import os
 from pathlib import Path
 import numpy as np
+from requests import Session
 from transformers import AutoTokenizer, AutoModel
 import torch
 from tqdm import tqdm
 from common import  print_with_time, print_error
 from collections import Counter
-from db_utils import Db
 from bll.idsduplicados import IdsDuplicados
 from sqlalchemy import text
 import localconfig
 
 class GenerateEmbeddings:
-    def __init__(self, db: Db, localcfg:localconfig):
+    def __init__(self, session: Session, localcfg:localconfig):
         """
         Initialize the GenerateEmbeddings class.
 
@@ -21,17 +21,17 @@ class GenerateEmbeddings:
             db (Db): Database connection instance.
             localconfig: The localconfig module to read configuration.
         """
-        self.db = db
+        self.session = session
         self.localconfig = localcfg
         self.config = localcfg.read_config()  # Read config from the provided localconfig module
         self.model_path = Path(self.config["model_path"])
         self.max_length = self.config["max_length"]
-        self.batch_size = int(self.config["itenslimit"])
+        self.batch_size = int(self.config["batch_size"])
         self.textual_fields = {'Text'}  # Fields for embeddings
         self.metadata_fields = {'Classe', 'Id', 'CodClasse', 'QtdItens'}  # Include QtdItens
         self.tokenizer = None
         self.model = None
-        self.ids_duplicados = IdsDuplicados(db)
+        self.ids_duplicados = IdsDuplicados(session)
 
         # Validate model directory
         if not os.path.isdir(self.model_path):
@@ -115,7 +115,7 @@ class GenerateEmbeddings:
 
         return embeddings
 
-    def start(self, split="train"):
+    def start(self):
         """
         Start the embedding generation process for the specified split.
 
@@ -128,6 +128,14 @@ class GenerateEmbeddings:
         trainingPath = self.localconfig.getTrainingPath()
 
         os.makedirs(trainingPath, exist_ok=True)
+
+        # caso o arquivo train_final exista, então deve criar o train_final
+        split = "train"
+        embeddings_file_name = os.path.join(trainingPath, f"{split}_text.npy")
+        if (os.path.exists(embeddings_file_name)):
+            split = "train_final"
+            embeddings_file_name = os.path.join(trainingPath, f"{split}_text.npy")
+
 
         # Define SQL query (deterministic with MIN(t.id))
         query = """
@@ -145,27 +153,21 @@ class GenerateEmbeddings:
 
         # Fetch data from database
         try:
-            session = self.db.get_session()
-            result = session.execute(text(query)).mappings().all()
+        
+            result = self.session.execute(text(query)).mappings().all()
             dados = [dict(row) for row in result]
-            session.close()
-        except Exception as e:
-            print_with_time(f"Error querying database for {split}: {e}")
-            raise RuntimeError(f"Error querying database: {e}")
+            self.session.close()
+        except Exception as e:            
+            raise RuntimeError(f"Erro executando consulta no banco de dados: {e}")
 
-        if not dados:
-            print_with_time(f"Warning: No data retrieved for {split}, skipping processing.")
-            return
+        if not dados:            
+            return RuntimeWarning("Não ha dados para gerar o modelo de embeddings.")
 
         print_with_time(f"Initial GPU memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
 
         # Validate textual fields
-        if not self.textual_fields:
-            print_with_time("Error: No textual fields defined in TEXTUAL_FIELDS")
-            raise RuntimeError("No textual fields defined")
-
-        print_with_time(f"Textual fields: {self.textual_fields}")
-        print_with_time(f"Metadata fields: {self.metadata_fields}")
+        if not self.textual_fields:            
+            raise RuntimeError("No textual fields defined")        
 
         # Prepare structures
         field_embeddings = {field: [] for field in self.textual_fields}
@@ -173,7 +175,8 @@ class GenerateEmbeddings:
         skipped = 0
         invalid_reasons = Counter()
 
-        print_with_time(f"Processing split '{split}' ({len(dados)} examples) in batches of {self.batch_size}...")
+        print_with_time(f"Processando ({len(dados)} registros) e lotes de {self.batch_size} para o banco {split}...")
+
 
         # Process in batches
         for i in tqdm(range(0, len(dados), self.batch_size), desc="Generating embeddings in batches"):
@@ -225,44 +228,40 @@ class GenerateEmbeddings:
                             cod_classe=exemplo['CodClasse']
                         )
 
-                # Clear cache every 5 batches
-                if i % (self.batch_size * 5) == 0:
+                # Clear cache every 20 batches
+                if i % 20 == 0:
                     torch.cuda.empty_cache()
 
             except torch.cuda.CudaError as e:
-                print_with_time(f"CUDA error in batch {i//self.batch_size}: {e}")
+                print_error(f"CUDA error in batch {i//self.batch_size}: {e}")
                 torch.cuda.empty_cache()
                 skipped += len(batch_valid)
                 continue
             except Exception as e:
-                print_with_time(f"Error in batch {i//self.batch_size}: {e}")
+                print_error(f"Error in batch {i//self.batch_size}: {e}")
                 skipped += len(batch_valid)
                 continue
 
         # Report
-        print_with_time(f"Split '{split}': {len(dados) - skipped} examples processed, {skipped} examples skipped.")
+        print_with_time(f"Split : {len(dados) - skipped} examples processed, {skipped} examples skipped.")
 
         # Validate
         if not field_embeddings:
-            print_with_time("Error: No textual fields processed for embeddings")
-            raise RuntimeError("No textual fields processed")
+            raise RuntimeError("Error: No textual fields processed for embeddings")
 
         lengths = {field: len(embs) for field, embs in field_embeddings.items()}
         metadata_lengths = {field: len(values) for field, values in field_metadata.items()}
 
         for field, length in lengths.items():
-            if length == 0:
-                print_with_time(f"Error: Textual field '{field}' has 0 entities")
+            if length == 0:                
                 raise RuntimeError(f"Textual field '{field}' has 0 entities")
 
         unique_lengths = set(lengths.values())
-        if len(unique_lengths) > 1:
-            print_with_time(f"Error: Textual fields have different entity counts: {lengths}")
+        if len(unique_lengths) > 1:            
             raise RuntimeError(f"Textual fields have different entity counts: {lengths}")
 
         for field, length in metadata_lengths.items():
-            if length == 0 or length != list(lengths.values())[0]:
-                print_with_time(f"Error in metadata '{field}': length {length}")
+            if length == 0 or length != list(lengths.values())[0]:                
                 raise RuntimeError(f"Metadata '{field}' has incorrect length: {length}")
 
         # Convert to NumPy
@@ -270,6 +269,7 @@ class GenerateEmbeddings:
         for field in field_metadata:
             field_metadata[field] = np.array(field_metadata[field], dtype=object)
 
+            
         # Save embeddings
         embeddings_file = os.path.join(trainingPath, f"{split}_text.npy")
         try:

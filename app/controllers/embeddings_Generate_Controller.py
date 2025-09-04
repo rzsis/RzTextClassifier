@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 from fastapi import APIRouter
 from common import print_with_time, print_error, get_db, get_localconfig
+from bll.embeddings_generate import GenerateEmbeddings as bllGenerateEmbeddings
 router = APIRouter()
 
 #faz o treinamento a montagem do banco dos embeddings
@@ -15,7 +16,7 @@ async def GenerateEmbeddings(
     localcfg = Depends(get_localconfig),
 ):    
     try:        
-        generator = GenerateEmbeddings(db=db, localcfg=localcfg)        
+        generator = bllGenerateEmbeddings(session=db, localcfg=localcfg)        
         generator.start()
         return {"status": "success", "message": f"Embeddings generated for split "}
     except Exception as e:        
