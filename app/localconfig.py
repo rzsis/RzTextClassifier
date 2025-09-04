@@ -80,3 +80,6 @@ def getModelPath() -> str:
 def getEmbendingPath() -> str:
     return os.path.join(__configReaded["embendingPath"], getModelName())
 
+def getTrainingPath() -> str:
+    return os.path.join(__configReaded["trainingPath"], getModelName())
+

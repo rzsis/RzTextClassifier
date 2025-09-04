@@ -2,14 +2,20 @@
 from pathlib import Path
 from datetime import datetime
 import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.exceptions import RequestValidationError
 from fastapi import HTTPException
 from starlette.responses import JSONResponse
-from logging.handlers import RotatingFileHandler
 import logger
+import db_utils
+import localconfig
+
+# Global variables for dependency injection
+_db = None
+_localconfig = None
 
 last_print_time = time.time()
+
 def print_with_time(message):
     global last_print_time
     current_time = time.time()
@@ -25,3 +31,26 @@ def print_error(message):
     last_print_time = current_time
 
 
+def init_dependencies(appName: str):
+    global _localconfig, _db
+    localconfig.load_config(appName)         
+    _localconfig = localconfig
+    _db = db_utils.Db(localconfig)   # cria engine + sessionmaker UMA vez
+    
+
+def get_db():
+    """
+    Dependency function to provide a Session (não o objeto Db).
+    """
+    if _db is None:
+        raise RuntimeError("Db not initialized. Call init_dependencies first.")
+    session = _db.get_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+def get_localconfig():
+    if _localconfig is None:
+        raise RuntimeError("localconfig not initialized in common")
+    return _localconfig

@@ -3,10 +3,10 @@ from operator import index
 from fastapi import FastAPI
 import controllers.textController as textController
 import controllers.indexController as indexController
+import controllers.embeddings_Generate_Controller as embeddings_Generate_Controller
 import localconfig
 import common
 import logger
-import db_utils
 import bll.embeddings as bllEmbeddings
 
 appName = "RzTextClassifier"
@@ -17,7 +17,7 @@ logger.setup_global_exception_logging()  # sem app, já cobre sys/threading/asyn
 logger.build_logger(appName)
 
 # Inicializa arquivo de configuração
-localconfig.load_config(appName)
+common.init_dependencies(appName)
 
 # 3) Cria o app e registra handlers do FastAPI
 fastApi = FastAPI()
@@ -26,8 +26,12 @@ logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers
 # 4) Registra os controllers (APIRouter)
 fastApi.include_router(textController.router)
 fastApi.include_router(indexController.router)
+fastApi.include_router(embeddings_Generate_Controller.router)
 
-db_utils.Db(localconfig)  # tenta conectar com o banco de dados
+
+if (common._db.test_connection() is not None):
+    common.print_with_time("Conexão com banco de dados estabelecida com sucesso")
+
 
 embeddings = bllEmbeddings.Embenddings(localconfig)  # inicializa modelos (carrega embeddings)
 embeddings.load_model_and_embendings()
