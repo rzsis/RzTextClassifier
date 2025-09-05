@@ -40,7 +40,7 @@ class SearchIdIguais:
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar dados do banco: {e}")            
 
-    def _load_embeddings_and_metadata(self, embeddings_dir: Path, split: str, field: str) -> tuple:
+    def _load_embeddings_and_metadata(self) -> tuple:
         try:
             embeddings, metadata = self.embeddings_handler.load_model_and_embendings("train")  # Load training embeddings
         except Exception as e:
@@ -66,12 +66,11 @@ class SearchIdIguais:
             print_error(f"Erro ao salvar JSON: {e}")
             raise RuntimeError(f"Error saving JSON: {e}")
 
-    def _process_dataset(self, dataset_name: str, embedding_dir: Path) -> None:
+    def _process_dataset(self) -> None:
         """
         Process a dataset to find similar items and save results.
         Args:
             dataset_name (str): Name of the dataset (e.g., 'train_final').
-            embedding_dir (Path): Directory containing embeddings and metadata.
         """
         # Clear previous records
         try:
@@ -83,7 +82,7 @@ class SearchIdIguais:
         data = self._fetch_data()
 
         # Load embeddings and metadata
-        embeddings, metadata, id_to_index = self._load_embeddings_and_metadata(embedding_dir, dataset_name, self.field)
+        embeddings, metadata, id_to_index = self._load_embeddings_and_metadata()
 
         # Create mapping of Id to data index
         json_id_to_index = {item["Id"]: idx for idx, item in enumerate(data)}
@@ -166,10 +165,10 @@ class SearchIdIguais:
         cleaned_data = [data[i] for i in sorted(keep_indices)]
 
         # Save JSON files
-        collision_file = self.output_dir / f"{dataset_name}_log_com_colisao_mesma_classe.json"
+        collision_file = self.output_dir / f"log_com_colisao_mesma_classe.json"
         self._save_json(output_data, collision_file)
 
-        clean_file = self.output_dir / f"{dataset_name}_sem_colisao_mesma_classe.json"
+        clean_file = self.output_dir / f"log_sem_colisao_mesma_classe.json"
         self._save_json(cleaned_data, clean_file)
 
         # Insert duplicates into database
@@ -183,7 +182,7 @@ class SearchIdIguais:
             print_error(f"Erro ao inserir IdsIguais no banco: {e}")
             raise
 
-        print_with_time(f"Processamento concluído para {dataset_name}")
+        print_with_time(f"Processamento de busca concluida")
         print_with_time(f"Registros removidos: {removed_count}")
         print_with_time(f"Registros mantidos: {len(cleaned_data)}")
 
@@ -191,7 +190,6 @@ class SearchIdIguais:
         """
         Start processing the dataset.
         """
-        dataset_name = "train_final"
-        print_with_time(f"Iniciando processamento de {dataset_name}...")
-        self._process_dataset(dataset_name, self.embeddings_dir)
+        print_with_time(f"Iniciando processamento de search_ids_iguais...")
+        self._process_dataset()
         print_with_time("Processamento completo! Execute clean_similarity_diferent_class para remover colisões de classes diferentes.")
