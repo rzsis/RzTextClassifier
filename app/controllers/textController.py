@@ -21,3 +21,5 @@ async def ClassificaTexto(texto: str):
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
     
 
+    
+

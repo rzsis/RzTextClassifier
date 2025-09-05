@@ -1,3 +1,4 @@
+#embeddings.py
 import os
 import json
 from pathlib import Path
@@ -40,7 +41,22 @@ class Embenddings:
             raise RuntimeError(f"Erro ao gerar embedding: {e}")            
 
     #Inicializa os modelos e carrega os embeddings
-    def load_model_and_embendings(self):      
+    #embedding_type pode ser train ou final
+    def load_model_and_embendings(self, embedding_type: str):              
+
+        # define os caminhos dos arquivos de embeddings e metadados
+        if embedding_type == "train":
+            embeddings_file = Path(self.localconfig.getTrainingPath(),f"train_text.npy")
+            metadata_file = Path(self.localconfig.getTrainingPath(),f"train_metadata.npz")
+        elif embedding_type == "final":
+            embeddings_file = Path(self.localconfig.getEmbendingPath(),f"train_final_text.npy")
+            metadata_file = Path(self.localconfig.getEmbendingPath(),f"train_final_metadata.npz")
+        else:
+            raise RuntimeError("embedding_type deve ser 'train' ou 'final'")
+
+        if not embeddings_file.exists() or not metadata_file.exists():
+            raise RuntimeError(f"Arquivos de embeddings {embeddings_file.stem} ou metadados {metadata_file.stem} não encontrados em {self.localconfig.getEmbendingPath()}")
+            
         print_with_time(f"Inicializando modelos e embeddings...")
         # Carregar tokenizer e modelo para gerar novos embeddings caso necessario
         try:
@@ -55,13 +71,6 @@ class Embenddings:
             print_with_time(f"Modelo e tokenizer carregados de {model_path}")
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")            
-
-        # Carregar embeddings e metadados
-        embeddings_file = Path(self.localconfig.getEmbendingPath(),f"train_final_text.npy")
-        metadata_file = Path(self.localconfig.getEmbendingPath(),f"train_final_metadata.npz")
-
-        if not embeddings_file.exists() or not metadata_file.exists():
-            raise RuntimeError(f"Arquivos de embeddings {embeddings_file.stem} ou metadados {metadata_file.stem} não encontrados em {self.localconfig.getEmbendingPath()}")
 
         try:            
             self.embeddings = np.load(embeddings_file)            
@@ -82,7 +91,8 @@ class Embenddings:
         
         # Normalizar embeddings de referência e criar índice FAISS usando normalize_embeddings
         self.embeddings = self.normalize_embeddings(self.embeddings, "embeddings de referência")
-        print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")        
+        print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")    
+        return self.embeddings, self.metadata    
 
 
     def search_similarities(self, query_embedding: np.ndarray, top_k: int = 5) -> list:

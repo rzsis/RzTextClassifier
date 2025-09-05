@@ -127,8 +127,10 @@ class GenerateEmbeddings:
             FROM textos_treinamento t
             INNER JOIN classes c ON c.CodClasse = t.CodClasse
             WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
-            AND t.CodClasse IS NOT NULL            
+            AND t.CodClasse IS NOT NULL 
+            AND not t.id in (Select id from idsDuplicados)
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
+            Order by t.id
         """
 
         # Fetch data from database
