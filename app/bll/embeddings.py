@@ -64,6 +64,9 @@ class Embenddings:
             if (os.path.exists(model_path) == False):
                 raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")                                 
 
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.model = AutoModel.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
             self.model.eval()

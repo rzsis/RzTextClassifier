@@ -24,13 +24,13 @@ class SearchIdIguais:
         self.localconfig = localcfg
         self.config = localcfg.read_config()
         self.dataset_path = Path(self.config["dataset_path"])
-        self.embeddings_dir = Path(localcfg.getEmbendingPath())
+        self.embeddings_dir = Path(localcfg.getEmbeddingsTrain())
         self.log_dir = "../log"
         self.field = "text"
         self.k = 50  # Number of nearest neighbors to search
         self.similarity_threshold = 0.985  # Similarity threshold for marking duplicates
         self.id_iguais_bll = IdIguaisBll(session)
-        self.generate_embeddings = GenerateEmbeddings(session, localcfg)
+        self.generate_embeddings = GenerateEmbeddings('train', session, localcfg)
         self.embeddings_handler = Embenddings(localcfg)
 
     def _fetch_data(self) -> list:        
