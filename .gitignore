@@ -7,4 +7,5 @@ app/bll/__pycache__/
 app/bll/__pycache__/embeddings.cpython-311.pyc
 __pycache__/
 app/bll/__pycache__/embeddings.cpython-311.pyc
-trainingDatabase/
+embeddingsTrain/
+embeddingsFinal/

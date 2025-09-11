@@ -27,9 +27,9 @@ def load_config(appName: str ):
 def checkRequiredKeys():
     required_keys = [
         "DataBaseConnectString",
-        "model_path",
-        
-        "embendingPath",
+        "model_path",        
+        "embeddingsFinal",
+        "embeddingsTrain",
         "http_port",
         "dataset_path",
         "batch_size",
@@ -77,9 +77,9 @@ def getModelPath() -> str:
     model_path = Path(__configReaded["model_path"])
     return model_path
 
-def getEmbendingPath() -> str:
-    return os.path.join(__configReaded["embendingPath"], getModelName())
+def getEmbendingFinal() -> str:
+    return os.path.join(__configReaded["embeddingsFinal"], getModelName())
 
-def getTrainingPath() -> str:
-    return os.path.join(__configReaded["trainingPath"], getModelName())
+def getEmbeddingsTrain() -> str:
+    return os.path.join(__configReaded["embeddingsTrain"], getModelName())
 

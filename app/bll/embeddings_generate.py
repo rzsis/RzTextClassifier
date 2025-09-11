@@ -13,7 +13,7 @@ from sqlalchemy import text
 import localconfig
 
 class GenerateEmbeddings:
-    def __init__(self, session: Session, localcfg:localconfig):
+    def __init__(self, split:str, session: Session, localcfg:localconfig):
         """
         Initialize the GenerateEmbeddings class.
 
@@ -24,14 +24,15 @@ class GenerateEmbeddings:
         self.session        = session
         self.localconfig    = localcfg
         self.config         = localcfg.read_config()  # Read config from the provided localconfig module
-        self.trainingPath   = localcfg.getTrainingPath()                
+        self.embeddingsTrain   = localcfg.getEmbeddingsTrain()                
         self.model_path     = Path(self.config["model_path"])
         self.max_length     = self.config["max_length"]
         self.batch_size     = int(self.config["batch_size"])
         self.textual_fields = {'Text'}  # Fields for embeddings
         self.metadata_fields = {'Classe', 'Id', 'CodClasse', 'QtdItens'}  # Include QtdItens
-        self.tokenizer = None
-        self.model = None
+        self.tokenizer      = None
+        self.model          = None  
+        self.split          = split  # 'train' or 'final'      
         self.ids_duplicados = IdsDuplicados(session)
 
         # Validate model directory
@@ -128,9 +129,9 @@ class GenerateEmbeddings:
             INNER JOIN classes c ON c.CodClasse = t.CodClasse
             WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
             AND t.CodClasse IS NOT NULL 
-            AND not t.id in (Select id from idsDuplicados)
+            AND not t.id in (Select id from idsduplicados)            
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
-            Order by t.id
+            Order by t.id            
         """
 
         # Fetch data from database
@@ -257,10 +258,29 @@ class GenerateEmbeddings:
 
         return field_embeddings, field_metadata 
 
+    def _create_embeddings_backup(self, split):
+        backup_dir = os.path.join(self.embeddingsTrain, "backup")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        embeddings_file = os.path.join(self.embeddingsTrain, f"{split}_text.npy")
+        metadata_file = os.path.join(self.embeddingsTrain, f"{split}_metadata.npz")
+
+        if os.path.exists(embeddings_file):
+            backup_embeddings_file = os.path.join(backup_dir, f"{split}_text_backup.npy")
+            os.rename(embeddings_file, backup_embeddings_file)
+            print_with_time(f"Backup created for embeddings: {backup_embeddings_file}")
+
+        if os.path.exists(metadata_file):
+            backup_metadata_file = os.path.join(backup_dir, f"{split}_metadata_backup.npz")
+            os.rename(metadata_file, backup_metadata_file)
+            print_with_time(f"Backup created for metadata: {backup_metadata_file}")
+
+
     # Save embeddings and metadata to disk
     def _save_embeddings(self,split,field_embeddings,field_metadata):
+        self._create_embeddings_backup( split)  # Create backup if files exist
 
-        embeddings_file = os.path.join(self.trainingPath, f"{split}_text.npy")
+        embeddings_file = os.path.join(self.embeddingsTrain, f"{split}_text.npy")
         try:
             np.save(embeddings_file, field_embeddings['Text'])
             print_with_time(f"Embeddings for text saved to: {embeddings_file}")
@@ -269,7 +289,7 @@ class GenerateEmbeddings:
             raise RuntimeError(f"Error saving embeddings: {e}")
 
         # Save metadata
-        metadata_file = os.path.join(self.trainingPath, f"{split}_metadata.npz")
+        metadata_file = os.path.join(self.embeddingsTrain, f"{split}_metadata.npz")
         try:
             np.savez(metadata_file, **field_metadata)
             print_with_time(f"Metadata (including {self.metadata_fields}) saved to: {metadata_file}")
@@ -279,18 +299,7 @@ class GenerateEmbeddings:
 
         print_with_time(f"✅ Split '{split}' processado com sucesso")
 
-
-    #define o nome do split e como ele vai ser salvo
-    def _setSplit(self) -> str:        
-        os.makedirs(self.trainingPath, exist_ok=True)
-        # caso o arquivo train_final exista, então deve criar o train_final
-        split = "train"
-        embeddings_file_name = os.path.join(self.trainingPath, f"{split}_text.npy")
-        if (os.path.exists(embeddings_file_name)):
-            split = "train_final"
-            embeddings_file_name = os.path.join(self.trainingPath, f"{split}_text.npy")
-
-        return split
+    
 
     def start(self):
         """
@@ -299,10 +308,9 @@ class GenerateEmbeddings:
         Args:
             split (str): Data split to process (default: 'train').
         """
-        split = self._setSplit()#define se vai ser train ou train_final
 
         dados = self._fecth_data() #busca os dados no banco de dados
      
-        field_embeddings,field_metadata = self._process_embeddings(dados,split)# processa os dados e transforma em embeddings
+        field_embeddings,field_metadata = self._process_embeddings(dados,self.split)# processa os dados e transforma em embeddings
             
-        self._save_embeddings(split,field_embeddings,field_metadata)# salva em disco os embeddings e metadados
+        self._save_embeddings(self.split,field_embeddings,field_metadata)# salva em disco os embeddings e metadados

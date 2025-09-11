@@ -46,16 +46,16 @@ class Embenddings:
 
         # define os caminhos dos arquivos de embeddings e metadados
         if embedding_type == "train":
-            embeddings_file = Path(self.localconfig.getTrainingPath(),f"train_text.npy")
-            metadata_file = Path(self.localconfig.getTrainingPath(),f"train_metadata.npz")
+            embeddings_file = Path(self.localconfig.getEmbeddingsTrain(),f"train_text.npy")
+            metadata_file = Path(self.localconfig.getEmbeddingsTrain(),f"train_metadata.npz")
         elif embedding_type == "final":
-            embeddings_file = Path(self.localconfig.getEmbendingPath(),f"train_final_text.npy")
-            metadata_file = Path(self.localconfig.getEmbendingPath(),f"train_final_metadata.npz")
+            embeddings_file = Path(self.localconfig.getEmbendingFinal(),f"train_final_text.npy")
+            metadata_file = Path(self.localconfig.getEmbendingFinal(),f"train_final_metadata.npz")
         else:
             raise RuntimeError("embedding_type deve ser 'train' ou 'final'")
 
         if not embeddings_file.exists() or not metadata_file.exists():
-            raise RuntimeError(f"Arquivos de embeddings {embeddings_file.stem} ou metadados {metadata_file.stem} não encontrados em {self.localconfig.getEmbendingPath()}")
+            raise RuntimeError(f"Arquivos de embeddings {embeddings_file.stem} ou metadados {metadata_file.stem} não encontrados em {self.localconfig.getEmbendingFinal()}")
             
         print_with_time(f"Inicializando modelos e embeddings...")
         # Carregar tokenizer e modelo para gerar novos embeddings caso necessario

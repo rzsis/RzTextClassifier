@@ -25,10 +25,10 @@ class SearchIdIguais:
         self.config = localcfg.read_config()
         self.dataset_path = Path(self.config["dataset_path"])
         self.embeddings_dir = Path(localcfg.getEmbendingPath())
-        self.output_dir = self.dataset_path
+        self.log_dir = "../log"
         self.field = "text"
         self.k = 50  # Number of nearest neighbors to search
-        self.similarity_threshold = 0.99  # Similarity threshold for marking duplicates
+        self.similarity_threshold = 0.985  # Similarity threshold for marking duplicates
         self.id_iguais_bll = IdIguaisBll(session)
         self.generate_embeddings = GenerateEmbeddings(session, localcfg)
         self.embeddings_handler = Embenddings(localcfg)
@@ -146,7 +146,8 @@ class SearchIdIguais:
                 if sim > 0.85:
                     collision_info.append({
                         "Id": neighbor_id,
-                        "semelhanca": float(sim)
+                        "Semelhanca": float(sim),
+                        "CodClasse": neighbor_cod_classe,
                     })
 
             # Add item to output if it has collisions
@@ -165,10 +166,10 @@ class SearchIdIguais:
         cleaned_data = [data[i] for i in sorted(keep_indices)]
 
         # Save JSON files
-        collision_file = self.output_dir / f"log_com_colisao_mesma_classe.json"
+        collision_file = os.path.join(self.log_dir,f"log_com_colisao_mesma_classe.json")
         self._save_json(output_data, collision_file)
 
-        clean_file = self.output_dir / f"log_sem_colisao_mesma_classe.json"
+        clean_file = os.path.join(self.log_dir,f"log_sem_colisao_mesma_classe.json")
         self._save_json(cleaned_data, clean_file)
 
         # Insert duplicates into database

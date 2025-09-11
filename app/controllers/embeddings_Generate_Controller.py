@@ -12,12 +12,15 @@ router = APIRouter()
 
 #faz o treinamento a montagem do banco dos embeddings
 @router.post("/generateembeddings")
-async def GenerateEmbeddings(
+async def GenerateEmbeddings(split: str,
     db: Session = Depends(get_db),
     localcfg = Depends(get_localconfig),
-):    
+):        
     try:        
-        generator = bllGenerateEmbeddings(session=db, localcfg=localcfg)        
+        if split not in ["train", "final"]:
+            raise HTTPException(status_code=400, detail="split deve ser 'train' ou 'final'")    
+        
+        generator = bllGenerateEmbeddings(split, session=db, localcfg=localcfg)        
         generator.start()
         return {"status": "success", "message": f"Embeddings generated for split "}
     except Exception as e:        
