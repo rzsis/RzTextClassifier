@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import faiss
 import json
+from sympy import Id
 from tqdm import tqdm
 from sqlalchemy.orm import Session
 from common import print_with_time, print_error, get_localconfig
@@ -139,9 +140,9 @@ class GenerateIdsIguaisCollindgs:
                     if neighbor_orig_idx is None:
                         continue
                     items_to_remove.add(neighbor_orig_idx)
-                    lista_ids_collidentes.append(idCollidingModule.IdsColidentes(id=id_tram, 
+                    lista_ids_collidentes.append(idCollidingModule.IdsColidentes(Id=id_tram, 
                                                                     IdColidente=neighbor_id,
-                                                                    semelhanca=float(sim),
+                                                                    semelhanca=float(sim*100),
                                                                     ))
 
                 # Log collisions with similarity > similarity_threshold_colliding
