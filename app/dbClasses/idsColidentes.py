@@ -9,5 +9,4 @@ class IdsColidentes(Base):
 
     Id = Column(Integer, nullable=False, primary_key=True)
     IdColidente = Column(Integer, nullable=False, primary_key=True)
-    semelhanca = Column(Numeric(13, 4), nullable=True)
-    revisado = Column(Boolean, nullable=True, default=False)
+    semelhanca = Column(Numeric(13, 4), nullable=True)    

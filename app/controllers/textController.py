@@ -16,7 +16,7 @@ def init():
     global bllEmbeddings    
     from main import localconfig  # importa localconfig do main.py    
     if bllEmbeddings is None:
-        bllEmbeddings = bllEmbeddingsModule.Embenddings(localconfig)  # inicializa modelos (carrega embeddings)
+        bllEmbeddings = bllEmbeddingsModule.EmbenddingsModule(localconfig)  # inicializa modelos (carrega embeddings)
         bllEmbeddings.load_model_and_embendings("train")  # carrega os embeddings finais
 
 #endpoint para classificação de texto

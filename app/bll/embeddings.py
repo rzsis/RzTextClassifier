@@ -14,7 +14,7 @@ import csv
 import localconfig
 
 
-class Embenddings:
+class EmbenddingsModule:
     def __init__(self,localcfg:localconfig):
         self.localconfig = localcfg
         

@@ -12,7 +12,7 @@ from bll.idsduplicados import IdsDuplicados
 from sqlalchemy import text
 import localconfig
 
-class GenerateEmbeddings:
+class GenerateEmbeddingsModule:
     def __init__(self, split:str, session: Session, localcfg:localconfig):
         """
         Initialize the GenerateEmbeddings class.
@@ -131,6 +131,7 @@ class GenerateEmbeddings:
             AND t.CodClasse IS NOT NULL 
             AND not t.id in (Select id from idsduplicados)                        
             AND not t.id in (Select id from idsiguais)                        
+            and t.id = 35323242 
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
             Order by t.id            
         """
