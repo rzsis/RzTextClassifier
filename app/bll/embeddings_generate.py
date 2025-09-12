@@ -130,6 +130,7 @@ class GenerateEmbeddings:
             WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
             AND t.CodClasse IS NOT NULL 
             AND not t.id in (Select id from idsduplicados)                        
+            AND not t.id in (Select id from idsiguais)                        
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
             Order by t.id            
         """

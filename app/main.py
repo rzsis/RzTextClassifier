@@ -33,8 +33,7 @@ if (common._db.test_connection() is not None):
     common.print_with_time("Conexão com banco de dados estabelecida com sucesso")
 
 
-embeddings = bllEmbeddings.Embenddings(localconfig)  # inicializa modelos (carrega embeddings)
-embeddings.load_model_and_embendings("train")  # carrega os embeddings finais
+
 
 
 if __name__ == "__main__":
