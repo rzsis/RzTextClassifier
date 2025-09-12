@@ -71,7 +71,7 @@ class GenerateIdsIguaisCollindgs:
             raise RuntimeError(f"Error saving JSON: {e}")
 
     def _genetare_ids_colliding(self) -> None:
-        similarity_threshold_colliding = 0.90
+        similarity_threshold_colliding = 0.94
         """
         Process a dataset to find colliding items and save results.
         Args:
@@ -139,11 +139,18 @@ class GenerateIdsIguaisCollindgs:
                     neighbor_orig_idx = json_id_to_index.get(neighbor_id)
                     if neighbor_orig_idx is None:
                         continue
-                    items_to_remove.add(neighbor_orig_idx)
-                    lista_ids_collidentes.append(idCollidingModule.IdsColidentes(Id=id_tram, 
-                                                                    IdColidente=neighbor_id,
-                                                                    semelhanca=float(sim*100),
-                                                                    ))
+                    # Verifica se id_tram ou neighbor_id já estão na lista_ids_collidentes
+                    already_exists = any(
+                        id_collidente.Id == id_tram or id_collidente.IdColidente == id_tram or
+                        id_collidente.Id == neighbor_id or id_collidente.IdColidente == neighbor_id
+                        for id_collidente in lista_ids_collidentes
+                    )
+                    if not already_exists:                    
+                        items_to_remove.add(neighbor_orig_idx)
+                        lista_ids_collidentes.append(idCollidingModule.IdsColidentes(Id=id_tram, 
+                                                                        IdColidente=neighbor_id,
+                                                                        semelhanca=float(sim*100),
+                                                                        ))
 
                 # Log collisions with similarity > similarity_threshold_colliding
                 if sim > similarity_threshold_colliding:

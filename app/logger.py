@@ -12,48 +12,45 @@ from fastapi import HTTPException
 from starlette.responses import JSONResponse
 from logging.handlers import RotatingFileHandler
 
+log: logging.Logger
 
-log : logging.Logger
 # -----------------------------
 # Logger único da aplicação
 # -----------------------------
-def build_logger(appName: str) -> logging.Logger:    
-    global log 
-    log = logging.getLogger("app")    
+def build_logger(appName: str) -> logging.Logger:
+    global log
+    log = logging.getLogger("app")
     if log.handlers:  # evita duplicar handlers em reload
         return log
-    
-    log_path = f"../log/"
-    os.makedirs(log_path, exist_ok=True)
-    log_fileName = f"{appName}.log"
-    log_fileName = f"{log_path}{log_fileName}"
 
+    log_path = "../log/"
+    os.makedirs(log_path, exist_ok=True)
+    log_fileName = f"{log_path}{appName}.log"
+
+    # Use RotatingFileHandler for file logging with rotation
     handler = RotatingFileHandler(
         log_fileName,
-        maxBytes=2 * 1024 * 1024,  # 5 MB
-        backupCount=5,             # mantém até 5 arquivos antigos
+        maxBytes=2 * 1024 * 1024,  # 2 MB
+        backupCount=5,             # Keep up to 5 backup files
         encoding="utf-8"
-    )    
+    )
+    handler.setLevel(logging.DEBUG)
 
-
-
-    log.setLevel(logging.DEBUG)
-
-    fh = logging.FileHandler(log_fileName, mode="a", encoding="utf-8")
-    fh.setLevel(logging.DEBUG)
+    # Console handler for INFO-level output
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
 
+    # Formatter for both handlers
     fmt = logging.Formatter("%(message)s")
-    fh.setFormatter(fmt)
+    handler.setFormatter(fmt)
     ch.setFormatter(fmt)
 
-    log.addHandler(fh)
+    log.setLevel(logging.DEBUG)
+    log.addHandler(handler)
     log.addHandler(ch)
     log.propagate = False
 
     return log
-
 
 # -----------------------------
 # Decorator opcional para funções críticas
@@ -64,12 +61,10 @@ def log_errors(fn):
             return fn(*args, **kwargs)
         except Exception:
             raise Exception(f"Erro em {fn.__name__}")
-            raise
     return wrapper
 
 def _getDateTimeStr() -> str:
     return f"{datetime.now():%Y-%m-%d %H:%M:%S}"
-
 
 def info(txt: str):
     log.info(f"{_getDateTimeStr()} {txt}")
@@ -77,12 +72,11 @@ def info(txt: str):
 def error(txt: str):
     log.error(f"{_getDateTimeStr()} {txt}")
 
-
 # -----------------------------
 # Hooks globais de exceção
 # -----------------------------
 def _sys_excepthook(exc_type, exc, tb):
-    # pega qualquer exceção não tratada em threads principais
+    # Pega qualquer exceção não tratada em threads principais
     log.exception(f"{_getDateTimeStr()} Exceção não tratada", exc_info=(exc_type, exc, tb))
 
 def _threading_excepthook(args: threading.ExceptHookArgs):
@@ -105,7 +99,7 @@ def setup_global_exception_logging(app: FastAPI | None = None):
         loop = asyncio.get_event_loop()
         loop.set_exception_handler(_asyncio_excepthook)
     except RuntimeError:
-        # sem loop no momento (ok em import time)
+        # Sem loop no momento (ok em import time)
         pass
 
     if app:
