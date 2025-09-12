@@ -26,7 +26,7 @@ async def ClassificaTexto(texto: str):
     init()  # inicializa bllEmbeddings se ainda não foi inicializado    
 
     try:
-        return bllEmbeddings.classifica_texto(texto)
+        return bllEmbeddings.classifica_texto(texto, top_k=20)
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
     
