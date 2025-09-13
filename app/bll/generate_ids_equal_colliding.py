@@ -141,8 +141,8 @@ class GenerateIdsIguaisCollindgs:
                         continue
                     # Verifica se id_tram ou neighbor_id já estão na lista_ids_collidentes
                     already_exists = any(
-                        id_collidente.Id == id_tram or id_collidente.IdColidente == id_tram or
-                        id_collidente.Id == neighbor_id or id_collidente.IdColidente == neighbor_id
+                        # id_collidente.Id == id_tram or id_collidente.IdColidente == id_tram or
+                        id_collidente.IdColidente == neighbor_id or id_collidente.IdColidente == neighbor_id
                         for id_collidente in lista_ids_collidentes
                     )
                     if not already_exists:                    
