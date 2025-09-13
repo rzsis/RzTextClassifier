@@ -152,13 +152,13 @@ class GenerateIdsIguaisCollindgs:
                                                                         semelhanca=float(sim*100),
                                                                         ))
 
-                # Log collisions with similarity > similarity_threshold_colliding
-                if sim > similarity_threshold_colliding:
-                    collision_info.append({
-                        "Id": neighbor_id,
-                        "Semelhanca": float(sim),
-                        "CodClasse": neighbor_cod_classe,
-                    })
+                    # Log collisions with similarity > similarity_threshold_colliding and classe different
+                    if sim > similarity_threshold_colliding:
+                        collision_info.append({
+                            "Id": neighbor_id,
+                            "Semelhanca": float(sim),
+                            "CodClasse": neighbor_cod_classe,
+                        })
 
             # Add item to output if it has collisions
             if collision_info:
