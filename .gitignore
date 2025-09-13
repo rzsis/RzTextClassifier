@@ -9,3 +9,10 @@ __pycache__/
 app/bll/__pycache__/embeddings.cpython-311.pyc
 embeddingsTrain/
 embeddingsFinal/
+
+# Ignora todos os arquivos compilados Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
