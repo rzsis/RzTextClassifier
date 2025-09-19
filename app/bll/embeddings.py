@@ -155,7 +155,7 @@ class EmbenddingsModule:
             distances, indices = self.index.search(query_embedding, top_k)
             results = [
                 {
-                    "Id": self.metadata["Id"][idx],
+                    "IdEncontrado": self.metadata["Id"][idx],
                     "Similaridade": float(dist),
                     "Classe": self.metadata["Classe"][idx],
                     "CodClasse": int(self.metadata["CodClasse"][idx])
@@ -169,8 +169,12 @@ class EmbenddingsModule:
             medias_por_classe = defaultdict(list)  # Lista de similaridades por CodClasse
             contagem_por_classe = defaultdict(int)  # Contagem de itens com similaridade > 80%
 
+            metodo = ""  # Inicialmente nenhum método definido
             # Processar resultados para calcular médias e contagens
             for result in results:
+                if (result["Similaridade"] >= 0.97) and (metodo != "E"):
+                    metodo = "E"  # Exato                    
+
                 if result["Similaridade"] > 0.80:
                     medias_por_classe[result["CodClasse"]].append(result["Similaridade"])
                     contagem_por_classe[result["CodClasse"]] += 1
@@ -205,42 +209,28 @@ class EmbenddingsModule:
                 for cod_classe, quantidade in contagem_por_classe.items() if quantidade > 0
             ]
 
-            # Criar lista de ItemEncontrado
-            lista_itens = []
-            for result in results:
-                metodo = "E" if result["Similaridade"] > 0.97 else "M"
-               # cod_classe_media = classe_maior_media if classe_maior_media is not None else result["CodClasse"]
-               # cod_classe_qtd = classe_maior_qtd if classe_maior_qtd is not None else result["CodClasse"]
 
-                # Verificar se a classe com maior média tem menos de 2 itens
-                if media_maior > 0 and contagem_por_classe.get(classe_maior_media, 0) < 2:
-                    if qtd_maior > 4:  # Usar a classe com mais ocorrências se tiver mais de 4
-                        metodo = "Q"
-                        cod_classe_media = classe_maior_qtd
+            # Verificar se a classe com maior média tem menos de 2 itens
+            if metodo == "E":
+                item_pai = results[0]
+            elif (metodo != "E") and (media_maior >= 0.91):
+                metodo = "M"  # Média
+                item_pai = max(lista_classes_media, key=lambda x: x["Similaridade"])
+            else:                   
+                metodo = "Q"  
+                item_pai = max(lista_classes_qtd, key=lambda x: x["Quantidade"])                                      
 
-                lista_itens.append(
-                    self.ItemSimilar(
-                        IdEncontrado=result["Id"],
-                        CodClasse=result["CodClasse"],
-                        Classe=result["Classe"],
-                        Similaridade=result["Similaridade"]     
-                    )
-                )
-
-            # Determinar o item pai (primeiro item se similaridade > 97%, senão o de maior similaridade)
-            item_pai = results[0] if results[0]["Similaridade"] > 0.97 else max(results, key=lambda x: x["Similaridade"])
-            lista_final = [item for item in lista_itens if item.IdEncontrado != item_pai["Id"]]
 
             # Retornar objeto ResultadoSimilaridade
             return self.ResultadoSimilaridade(
-                IdEncontrado=item_pai["Id"],
+                IdEncontrado=item_pai["IdEncontrado"],
                 CodClasse=item_pai["CodClasse"],
                 Classe=item_pai["Classe"],
                 Similaridade=item_pai["Similaridade"],
-                Metodo="E" if item_pai["Similaridade"] > 0.97 else "M",
-                CodClasseMedia=classe_maior_media if classe_maior_media is not None else item_pai["CodClasse"],
-                CodClasseQtd=classe_maior_qtd if classe_maior_qtd is not None else item_pai["CodClasse"],
-                ListaSimilaridade=lista_final,
+                Metodo= metodo,
+                CodClasseMedia=classe_maior_media,
+                CodClasseQtd=classe_maior_qtd,
+                ListaSimilaridade=results,
                 ListaClassesMedia=lista_classes_media,
                 ListaClassesQtd=lista_classes_qtd
             )
