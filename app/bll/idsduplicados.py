@@ -32,8 +32,7 @@ class IdsDuplicados:
                 text(query),
                 {"cod_classe": cod_classe, "texto": texto, "id": id}
             )
-            session.commit()
-            print_with_time(f"Inserted duplicate IDs for text (ID: {id}, CodClasse: {cod_classe})")
+            session.commit()            
         except Exception as e:
             self.logger.error(f"Error inserting duplicate text (ID: {id}): {e}")
             print_error(f"Error inserting duplicate text (ID: {id}): {e}")

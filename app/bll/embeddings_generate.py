@@ -213,7 +213,7 @@ class GenerateEmbeddingsModule:
                         )
 
                 # Clear cache every 20 batches
-                if i % 3 == 0:
+                if i % 2 == 0:
                     torch.cuda.empty_cache()
 
             except torch.cuda.CudaError as e:
@@ -280,8 +280,14 @@ class GenerateEmbeddingsModule:
     # Save embeddings and metadata to disk
     def _save_embeddings(self,split,field_embeddings,field_metadata):
         self._create_embeddings_backup( split)  # Create backup if files exist
+        if (split == 'train'):
+            dest_path = self.embeddingsTrain    
+        else:
+            dest_path = self.embeddingsfinal
 
-        embeddings_file = os.path.join(self.embeddingsTrain, f"{split}_text.npy")
+        os.makedirs(dest_path, exist_ok=True)
+
+        embeddings_file = os.path.join(dest_path, f"{split}_text.npy")
         try:
             np.save(embeddings_file, field_embeddings['Text'])
             print_with_time(f"Embeddings for text saved to: {embeddings_file}")
