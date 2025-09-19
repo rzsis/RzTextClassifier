@@ -134,23 +134,20 @@ class EmbenddingsModule:
         print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")    
         return self.embeddings, self.metadata    
 
+    # Função auxiliar para criar listas de médias e quantidades para o retorno
+    def create_class_list(self,classe_map,data, model_class, field_name):
+                return [
+                    model_class(
+                        CodClasse=cod_classe,
+                        Classe=classe_map.get(cod_classe, "Nenhuma"),
+                        **{field_name: value}
+                    )
+                    for cod_classe, value in data.items() if value > 0
+                ] or [model_class(CodClasse=None, Classe="Nenhuma", **{field_name: 0})]
 
+    ##procura o texto mais similar no embeddings de referência
     def search_similarities(self, query_embedding: np.ndarray, top_k: int = 5) -> 'EmbenddingsModule.ResultadoSimilaridade':
-        """
-        Realiza busca de similaridade usando o índice FAISS pré-criado e retorna resultados formatados.
-
-        Args:
-            query_embedding (np.ndarray): Embedding normalizado do texto de consulta.
-            top_k (int): Número de resultados mais similares a retornar (padrão: 5).
-
-        Returns:
-            EmbenddingsModule.ResultadoSimilaridade: Objeto contendo o item pai, a lista de itens encontrados,
-            médias por classe e quantidades por classe.
-
-        Raises:
-            RuntimeError: Se houver erro ao realizar a busca.
-        """
-        min_similarity = 0.8  # Limite mínimo de similaridade para considerar um resultado relevante
+        min_similarity = 0.8
         try:
             faiss.normalize_L2(query_embedding)
             distances, indices = self.index.search(query_embedding, top_k)
@@ -161,93 +158,69 @@ class EmbenddingsModule:
                     "Classe": self.metadata["Classe"][idx],
                     "CodClasse": int(self.metadata["CodClasse"][idx])
                 }
-                for dist, idx in zip(distances[0], indices[0]) if (idx != -1) and (float(dist) > min_similarity)
+                for dist, idx in zip(distances[0], indices[0]) if idx != -1 and float(dist) > min_similarity
             ]
             if not results:
-               return self.ResultadoSimilaridade(
-                IdEncontrado=None,
-                CodClasse=None,
-                Classe=f"Não encontrada similaridade superior {min_similarity*100}%",
-                Similaridade=None,
-                Metodo= None,
-                CodClasseMedia=None,
-                CodClasseQtd=None,
-                ListaSimilaridade=None,
-                ListaClassesMedia=None,
-                ListaClassesQtd=None
-            )
+                return self.ResultadoSimilaridade(
+                    IdEncontrado=None,
+                    CodClasse=None,
+                    Classe=f"Não encontrada similaridade superior {min_similarity*100}%",
+                    Similaridade=None,
+                    Metodo=None,
+                    CodClasseMedia=None,
+                    CodClasseQtd=None,
+                    ListaSimilaridade=None,
+                    ListaClassesMedia=None,
+                    ListaClassesQtd=None
+                )
 
-            # Dicionários para calcular média de similaridade e contagem por classe
-            medias_por_classe = defaultdict(list)  # Lista de similaridades por CodClasse
-            contagem_por_classe = defaultdict(int)  # Contagem de itens com similaridade > 80%
+            # Criar mapeamento de CodClasse para Classe
+            classe_map = dict(zip(self.metadata["CodClasse"], self.metadata["Classe"]))
 
-            metodo = ""  # Inicialmente nenhum método definido
-            # Processar resultados para calcular médias e contagens
+            # Processar resultados
+            medias_por_classe = defaultdict(list)
+            contagem_por_classe = defaultdict(int)
+            max_sim_por_classe = defaultdict(lambda: None)  # Armazenar item diretamente
+            metodo = ""
+            item_pai = None
+
             for result in results:
-                if (result["Similaridade"] >= 0.97) and (metodo != "E"):
-                    metodo = "E"  # Exato                    
+                if result["Similaridade"] >= 0.97 and metodo != "E":
+                    metodo = "E"
+                    item_pai = result
+                cod_classe = result["CodClasse"]
+                medias_por_classe[cod_classe].append(result["Similaridade"])
+                contagem_por_classe[cod_classe] += 1
+                if max_sim_por_classe[cod_classe] is None or result["Similaridade"] > max_sim_por_classe[cod_classe]["Similaridade"]:
+                    max_sim_por_classe[cod_classe] = result
 
-                if result["Similaridade"] > min_similarity:
-                    medias_por_classe[result["CodClasse"]].append(result["Similaridade"])
-                    contagem_por_classe[result["CodClasse"]] += 1
-
-            # Calcular média por classe
-            medias = {cod_classe: sum(sims) / len(sims) if sims else 0.0 
-                      for cod_classe, sims in medias_por_classe.items()}
-
-            # Encontrar a classe com maior média
+            # Calcular médias
+            medias = {cod_classe: sum(sims) / len(sims) for cod_classe, sims in medias_por_classe.items()}
             classe_maior_media = max(medias.items(), key=lambda x: x[1], default=(None, 0.0))[0]
             media_maior = medias.get(classe_maior_media, 0.0)
 
-            # Encontrar a classe com maior número de ocorrências
+            #obtem a classe com maior quantidade
             classe_maior_qtd = max(contagem_por_classe.items(), key=lambda x: x[1], default=(None, 0))[0]
-            qtd_maior = contagem_por_classe.get(classe_maior_qtd, 0)
 
-            # Criar listas de médias e quantidades por classe
-            lista_classes_media = [
-                self.ClasseMedia(
-                    CodClasse=cod_classe,
-                    Classe=self.metadata["Classe"][self.metadata["CodClasse"] == cod_classe][0],
-                    Media=media
-                )
-                for cod_classe, media in medias.items() if media > 0
-            ]
-            lista_classes_qtd = [
-                self.ClasseQtd(
-                    CodClasse=cod_classe,
-                    Classe=self.metadata["Classe"][self.metadata["CodClasse"] == cod_classe][0],
-                    Quantidade=quantidade
-                )
-                for cod_classe, quantidade in contagem_por_classe.items() if quantidade > 0
-            ]
+            # Criar listas
+            lista_classes_media = self.create_class_list(classe_map,medias, self.ClasseMedia, "Media")
+            lista_classes_qtd = self.create_class_list(classe_map,contagem_por_classe, self.ClasseQtd, "Quantidade")
 
+            # Determinar metodo e item_pai se não for "E"
+            if metodo != "E":
+                if media_maior >= 0.91:
+                    metodo = "M"
+                    item_pai = max_sim_por_classe[classe_maior_media]
+                else:
+                    metodo = "Q"
+                    item_pai = max_sim_por_classe[classe_maior_qtd]
 
-            # Verificar se a classe com maior média tem menos de 2 itens
-            if metodo == "E":
-                item_pai = results[0]
-            elif (metodo != "E") and (media_maior >= 0.91):
-                metodo = "M"  # Média
-                item_pai = max(
-                                [r for r in results if r["CodClasse"] == classe_maior_media],
-                                key=lambda x: x["Similaridade"],
-                                default=results[0]
-                            )
-            else:                   
-                metodo = "Q"  
-                item_pai = max(
-                                [r for r in results if r["CodClasse"] == classe_maior_qtd],
-                                key=lambda x: x["Similaridade"],
-                                default=results[0]
-                            )                               
-
-
-            # Retornar objeto ResultadoSimilaridade
             return self.ResultadoSimilaridade(
                 IdEncontrado=item_pai["IdEncontrado"],
                 CodClasse=item_pai["CodClasse"],
                 Classe=item_pai["Classe"],
                 Similaridade=item_pai["Similaridade"],
-                Metodo= metodo,
+                Metodo=metodo,
                 CodClasseMedia=classe_maior_media,
                 CodClasseQtd=classe_maior_qtd,
                 ListaSimilaridade=results,
@@ -256,8 +229,7 @@ class EmbenddingsModule:
             )
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
-        
-
+                
     #normaliza os embeddings para poder comparar
     def normalize_embeddings(self, embeddings: np.ndarray, context: str = "embeddings") -> np.ndarray:
         """
