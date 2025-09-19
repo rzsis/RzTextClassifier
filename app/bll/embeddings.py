@@ -24,36 +24,36 @@ class EmbenddingsModule:
         
  # Classe para os itens da lista (cada item encontrado)
     class ItemSimilar(BaseModel):
-        IdEncontrado: int
-        CodClasse: int
-        Classe: str
-        Similaridade: float
+        IdEncontrado: Optional[int]
+        CodClasse: Optional[int]
+        Classe: Optional[str]
+        Similaridade: Optional[float]
 
 
     # Classe para representar médias por classe
     class ClasseMedia(BaseModel):
-        CodClasse: int
-        Classe: str
-        Media: float
+        CodClasse: Optional[int]
+        Classe: Optional[str]
+        Media: Optional[float]
 
     # Classe para representar quantidades por classe
     class ClasseQtd(BaseModel):
-        CodClasse: int
-        Classe: str
-        Quantidade: int
+        CodClasse: Optional[int]
+        Classe: Optional[str]
+        Quantidade: Optional[int]
 
     # Classe principal que inclui os campos e a lista de itens encontrados
     class ResultadoSimilaridade(BaseModel):
-        IdEncontrado: int
-        CodClasse: int
-        Classe: str
-        Similaridade: float
-        Metodo: str
-        CodClasseMedia: int
-        CodClasseQtd: int
-        ListaSimilaridade: List['EmbenddingsModule.ItemSimilar']
-        ListaClassesMedia: List['EmbenddingsModule.ClasseMedia']
-        ListaClassesQtd: List['EmbenddingsModule.ClasseQtd']
+        IdEncontrado: Optional[int]
+        CodClasse: Optional[int]
+        Classe: Optional[str]
+        Similaridade: Optional[float]
+        Metodo: Optional[str]
+        CodClasseMedia: Optional[int]
+        CodClasseQtd: Optional[int]
+        ListaSimilaridade: Optional[List['EmbenddingsModule.ItemSimilar']]
+        ListaClassesMedia: Optional[List['EmbenddingsModule.ClasseMedia']]
+        ListaClassesQtd: Optional[List['EmbenddingsModule.ClasseQtd']]
 
 
     # Função para gerar embedding para comparação do texto, transformando o texto em um vetor numérico
@@ -150,6 +150,7 @@ class EmbenddingsModule:
         Raises:
             RuntimeError: Se houver erro ao realizar a busca.
         """
+        min_similarity = 0.8  # Limite mínimo de similaridade para considerar um resultado relevante
         try:
             faiss.normalize_L2(query_embedding)
             distances, indices = self.index.search(query_embedding, top_k)
@@ -160,10 +161,21 @@ class EmbenddingsModule:
                     "Classe": self.metadata["Classe"][idx],
                     "CodClasse": int(self.metadata["CodClasse"][idx])
                 }
-                for dist, idx in zip(distances[0], indices[0]) if idx != -1
+                for dist, idx in zip(distances[0], indices[0]) if (idx != -1) and (float(dist) > min_similarity)
             ]
             if not results:
-                raise RuntimeError("Nenhum resultado encontrado na busca de similaridade.")
+               return self.ResultadoSimilaridade(
+                IdEncontrado=None,
+                CodClasse=None,
+                Classe=f"Não encontrada similaridade superior {min_similarity*100}%",
+                Similaridade=None,
+                Metodo= None,
+                CodClasseMedia=None,
+                CodClasseQtd=None,
+                ListaSimilaridade=None,
+                ListaClassesMedia=None,
+                ListaClassesQtd=None
+            )
 
             # Dicionários para calcular média de similaridade e contagem por classe
             medias_por_classe = defaultdict(list)  # Lista de similaridades por CodClasse
@@ -175,7 +187,7 @@ class EmbenddingsModule:
                 if (result["Similaridade"] >= 0.97) and (metodo != "E"):
                     metodo = "E"  # Exato                    
 
-                if result["Similaridade"] > 0.80:
+                if result["Similaridade"] > min_similarity:
                     medias_por_classe[result["CodClasse"]].append(result["Similaridade"])
                     contagem_por_classe[result["CodClasse"]] += 1
 
