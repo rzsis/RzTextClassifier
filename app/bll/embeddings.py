@@ -227,10 +227,18 @@ class EmbenddingsModule:
                 item_pai = results[0]
             elif (metodo != "E") and (media_maior >= 0.91):
                 metodo = "M"  # Média
-                item_pai = max(lista_classes_media, key=lambda x: x["Similaridade"])
+                item_pai = max(
+                                [r for r in results if r["CodClasse"] == classe_maior_media],
+                                key=lambda x: x["Similaridade"],
+                                default=results[0]
+                            )
             else:                   
                 metodo = "Q"  
-                item_pai = max(lista_classes_qtd, key=lambda x: x["Quantidade"])                                      
+                item_pai = max(
+                                [r for r in results if r["CodClasse"] == classe_maior_qtd],
+                                key=lambda x: x["Similaridade"],
+                                default=results[0]
+                            )                               
 
 
             # Retornar objeto ResultadoSimilaridade
