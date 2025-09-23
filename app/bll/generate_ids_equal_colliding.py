@@ -11,7 +11,7 @@ from common import print_with_time, print_error, get_localconfig
 from bll.idIguaisBll import IdIguaisBll as IdIguaisBllModule
 from bll.embeddings_generate import GenerateEmbeddingsModule
 from bll.idCollidingBll import IdCollidingBll as IdCollidingBllModule
-from bll.embeddings import EmbenddingsModule
+from bll.embeddings import EmbeddingsModule
 import dbClasses.idIguais as idIguaisModule
 import dbClasses.idsColidentes as idCollidingModule
 
@@ -35,7 +35,7 @@ class GenerateIdsIguaisCollindgs:
         self.id_iguais_bll = IdIguaisBllModule(session)
         self.id_colliding_bll = IdCollidingBllModule(session)
         self.generate_embeddings = GenerateEmbeddingsModule('train', session, localcfg)
-        self.embeddings_handler = EmbenddingsModule(localcfg)
+        self.embeddings_handler = EmbeddingsModule(localcfg)
 
     def _fetch_data(self) -> list:        
         try:

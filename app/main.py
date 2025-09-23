@@ -28,13 +28,8 @@ fastApi.include_router(textController.router)
 fastApi.include_router(indexController.router)
 fastApi.include_router(embeddings_Generate_Controller.router)
 
-
 if (common._db.test_connection() is not None):
     common.print_with_time("Conexão com banco de dados estabelecida com sucesso")
-
-
-
-
 
 if __name__ == "__main__":
     import uvicorn
