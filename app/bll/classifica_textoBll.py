@@ -1,4 +1,3 @@
-# classifica_texto_bll.py
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
@@ -19,15 +18,12 @@ class classifica_textoBll:
         Classe: Optional[str]
         Similaridade: Optional[float]
 
-    class ClasseMedia(BaseModel):
+    class ClassesInfo(BaseModel):
         CodClasse: Optional[int]
         Classe: Optional[str]
+        Quantidade: Optional[int]        
         Media: Optional[float]
 
-    class ClasseQtd(BaseModel):
-        CodClasse: Optional[int]
-        Classe: Optional[str]
-        Quantidade: Optional[int]
 
     class ResultadoSimilaridade(BaseModel):
         IdEncontrado: Optional[int]
@@ -38,9 +34,7 @@ class classifica_textoBll:
         CodClasseMedia: Optional[int]
         CodClasseQtd: Optional[int]
         ListaSimilaridade: Optional[List['classifica_textoBll.ItemSimilar']]
-        ListaClassesMedia: Optional[List['classifica_textoBll.ClasseMedia']]
-        ListaClassesQtd: Optional[List['classifica_textoBll.ClasseQtd']]
-
+        ListaClassesInfo: Optional[List['classifica_textoBll.ClassesInfo']]        
 
     def search_similarities(self, query_embedding: np.ndarray, top_k: int = 20) -> 'classifica_textoBll.ResultadoSimilaridade':
         """
@@ -51,8 +45,8 @@ class classifica_textoBll:
             top_k (int): Number of top similar results to return (default: 20).
 
         Returns:
-            ResultadoSimilaridade: Object containing similarity results, including lists of similar items,
-                                  class averages, and class counts.
+            ResultadoSimilaridade: Object containing similarity results, including lists of similar items
+                                  and class information (average and count).
 
         Raises:
             RuntimeError: If the search process fails.
@@ -80,8 +74,7 @@ class classifica_textoBll:
                     CodClasseMedia=None,
                     CodClasseQtd=None,
                     ListaSimilaridade=None,
-                    ListaClassesMedia=None,
-                    ListaClassesQtd=None
+                    ListaClassesInfo=None
                 )
 
             # Create mapping of CodClasse to Classe
@@ -98,9 +91,11 @@ class classifica_textoBll:
                 if result["Similaridade"] >= 0.97 and metodo != "E":
                     metodo = "E"
                     item_pai = result
+
                 cod_classe = result["CodClasse"]
                 medias_por_classe[cod_classe].append(result["Similaridade"])
                 contagem_por_classe[cod_classe] += 1
+
                 if max_sim_por_classe[cod_classe] is None or result["Similaridade"] > max_sim_por_classe[cod_classe]["Similaridade"]:
                     max_sim_por_classe[cod_classe] = result
 
@@ -112,28 +107,59 @@ class classifica_textoBll:
             # Get class with the highest count
             classe_maior_qtd = max(contagem_por_classe.items(), key=lambda x: x[1], default=(None, 0))[0]
 
-            # Create lists using a helper function
-            def create_class_list(classe_map, data, model_class, field_name):
-                return [
-                    model_class(
-                        CodClasse=cod_classe,
-                        Classe=classe_map.get(cod_classe, "Nenhuma"),
-                        **{field_name: value}
-                    )
-                    for cod_classe, value in data.items() if value > 0
-                ] or [model_class(CodClasse=None, Classe="Nenhuma", **{field_name: 0})]
+            # Create ClassesInfo list combining media and quantidade
+            lista_classes_info = [
+                self.ClassesInfo(
+                    CodClasse=cod_classe,
+                    Classe=classe_map.get(cod_classe, "Nenhuma"),
+                    Media=medias.get(cod_classe, 0.0),
+                    Quantidade=contagem_por_classe.get(cod_classe, 0)
+                )
+                for cod_classe in set(list(medias.keys()) + list(contagem_por_classe.keys()))
+                if medias.get(cod_classe, 0) > 0 or contagem_por_classe.get(cod_classe, 0) > 0
+            ] or [self.ClassesInfo(CodClasse=None, Classe="Nenhuma", Media=0.0, Quantidade=0)]
 
-            lista_classes_media = create_class_list(classe_map, medias, self.ClasseMedia, "Media")
-            lista_classes_qtd = create_class_list(classe_map, contagem_por_classe, self.ClasseQtd, "Quantidade")
-
+            maior_item_media = max(lista_classes_info,key=lambda x: x.Media or 0)
+            maior_item_qtd = max(lista_classes_info,key=lambda x: x.Quantidade or 0)
             # Determine method and parent item if not "E"
             if metodo != "E":
-                if media_maior >= 0.91:
+                if (maior_item_media.Media >= 0.91) and (maior_item_media.Quantidade >= 3):
+                    # Find the item in results with the highest Similaridade for the CodClasse with the highest Media                
+                    max_sim_item = max([result for result in results 
+                            if result["CodClasse"] == maior_item_media.CodClasse],
+                            key=lambda x: x["Similaridade"],
+                            default=None
+                    )                    
                     metodo = "M"
-                    item_pai = max_sim_por_classe[classe_maior_media]
-                else:
+                    item_pai = {
+                        "IdEncontrado": max_sim_item["IdEncontrado"] if max_sim_item else None,
+                        "CodClasse": maior_item_media.CodClasse,
+                        "Classe" : maior_item_media.Classe,
+                        "Similaridade": maior_item_media.Media
+                    }
+                elif (maior_item_qtd.Quantidade >= 4) and (maior_item_qtd.Media >= 0.87):
+                    # Find the item in results with the highest Qtd for the CodClasse with the highest Qtd                
+                    max_sim_item = max([result for result in results 
+                            if result["CodClasse"] == maior_item_qtd.CodClasse],
+                            key=lambda x: x["Quantidade"],
+                            default=None
+                    )   
+
                     metodo = "Q"
-                    item_pai = max_sim_por_classe[classe_maior_qtd]
+                    item_pai = {
+                        "IdEncontrado": max_sim_item["IdEncontrado"] if max_sim_item else None,
+                        "CodClasse": maior_item_qtd.CodClasse,
+                        "Classe" : maior_item_qtd.Classe,
+                        "Similaridade": maior_item_qtd.Media
+                    }
+                else:
+                    metodo = "N"
+                    item_pai = {
+                        "IdEncontrado": None,
+                        "CodClasse": None,
+                        "Classe" : "",
+                        "Similaridade": None
+                    }
 
             return self.ResultadoSimilaridade(
                 IdEncontrado=item_pai["IdEncontrado"],
@@ -144,8 +170,7 @@ class classifica_textoBll:
                 CodClasseMedia=classe_maior_media,
                 CodClasseQtd=classe_maior_qtd,
                 ListaSimilaridade=[self.ItemSimilar(**result) for result in results],
-                ListaClassesMedia=lista_classes_media,
-                ListaClassesQtd=lista_classes_qtd
+                ListaClassesInfo=lista_classes_info
             )
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
@@ -159,8 +184,8 @@ class classifica_textoBll:
             top_k (int): Número de resultados mais similares a retornar (padrão: 20).
 
         Returns:
-            ResultadoSimilaridade: Object containing similarity results, including lists of similar items,
-                                  class averages, and class counts.
+            ResultadoSimilaridade: Object containing similarity results, including lists of similar items
+                                  and class information (average and count).
 
         Raises:
             RuntimeError: If embedding generation or similarity search fails.
