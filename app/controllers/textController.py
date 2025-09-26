@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException,Depends
 from pydantic import BaseModel
 import time
 from typing import Optional
@@ -8,6 +8,8 @@ import common
 from fastapi import APIRouter
 import bll.embeddings as embeddingsModule
 import bll.classifica_textoBll as classifica_textoBllModule    
+from common import get_db
+from sqlalchemy.orm import Session
 
 bllEmbeddings = None
 
@@ -22,12 +24,16 @@ def init():
 
 #endpoint para classificação de texto
 @router.post("/classificaTexto")
-async def ClassificaTexto(texto: str):    
+async def ClassificaTexto(texto: str,
+                          id_a_classificar: Optional[int] = None,
+                          TabelaOrigem:Optional[str] = "",
+                          db: Session = Depends(get_db)  ):    
     # Executar script de restauração
     init()  # inicializa bllEmbeddings se ainda não foi inicializado    
 
     try:     
-        return classifica_textoBllModule.classifica_textoBll(bllEmbeddings).classifica_texto(texto, top_k=20)
+        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(bllEmbeddings,db)
+        return classifica_textoBll.classifica_texto(texto,id_a_classificar,TabelaOrigem, top_k=20)
     
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")

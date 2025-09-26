@@ -1,15 +1,18 @@
+import string
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
+import bll.log_ClassificacaoBll as log_ClassificacaoBllModule
 from bll.embeddings import EmbeddingsModule  # Importing the original module
 from collections import defaultdict
 import faiss
 from transformers import AutoTokenizer
+from sqlalchemy.orm import Session
 
 class classifica_textoBll:
-    def __init__(self, embeddingsModule: EmbeddingsModule):
-        # Initialize the EmbenddingsModule with the provided localconfig
-        self.embeddingsModule = embeddingsModule        
+    def __init__(self, embeddingsModule: EmbeddingsModule, session: Session):        
+        self.embeddingsModule = embeddingsModule          
+        self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)     
 
     # Pydantic model classes
     class ItemSimilar(BaseModel):
@@ -36,7 +39,9 @@ class classifica_textoBll:
         ListaSimilaridade: Optional[List['classifica_textoBll.ItemSimilar']]
         ListaClassesInfo: Optional[List['classifica_textoBll.ClassesInfo']]        
 
-    def search_similarities(self, query_embedding: np.ndarray, top_k: int = 20) -> 'classifica_textoBll.ResultadoSimilaridade':
+    def search_similarities(self, query_embedding: np.ndarray, id_a_classificar:Optional[int] = None, 
+                                TabelaOrigem:Optional[str] = "", 
+                                top_k: int = 20) -> 'classifica_textoBll.ResultadoSimilaridade':
         """
         Searches for similar embeddings in the reference set.
 
@@ -161,6 +166,9 @@ class classifica_textoBll:
                         "Similaridade": None
                     }
 
+            self.log_ClassificacaoBll.gravaLogClassificacao(item_pai["IdEncontrado"], id_a_classificar, metodo, TabelaOrigem)
+
+
             return self.ResultadoSimilaridade(
                 IdEncontrado=item_pai["IdEncontrado"],
                 CodClasse=item_pai["CodClasse"],
@@ -175,7 +183,9 @@ class classifica_textoBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
 
-    def classifica_texto(self, texto: str, top_k: int = 20) -> 'classifica_textoBll.ResultadoSimilaridade':
+    def classifica_texto(self, texto: str, id_a_classificar: Optional[int] = None,
+                        TabelaOrigem:Optional[str] = "",
+                        top_k: int = 20) -> 'classifica_textoBll.ResultadoSimilaridade':
         """
         Classifica um texto com base na similaridade com embeddings de referência.
 
@@ -198,7 +208,7 @@ class classifica_textoBll:
             query_embedding = query_embedding.astype('float32')
             
             # Perform similarity search
-            return self.search_similarities(query_embedding, top_k)
+            return self.search_similarities(query_embedding,id_a_classificar , TabelaOrigem, top_k)
         
         except Exception as e:
             raise RuntimeError(f"Erro ao classificar texto: {e}")
