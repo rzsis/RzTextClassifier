@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 from common import  print_with_time, print_error
 from collections import Counter
-from bll.idsduplicados import IdsDuplicados
+from bll.idsduplicadosBll import IdsDuplicados
 from sqlalchemy import text
 import localconfig
 
