@@ -132,7 +132,7 @@ class GenerateEmbeddings:
             AND not t.id in (Select id from idsduplicados)                        
             AND not t.id in (Select id from idsiguais)                                    
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
-            Order by t.id            
+            Order by COUNT(t.id) DESC  /*ordena para inserir duplicatas primeiro em idduplicados para para poder ignorar depois*/           
         """
 
         # Fetch data from database
