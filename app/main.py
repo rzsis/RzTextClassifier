@@ -7,7 +7,7 @@ import controllers.embeddings_Generate_Controller as embeddings_Generate_Control
 import localconfig
 import common
 import logger
-import bll.embeddings as bllEmbeddings
+import bll.embeddingsBll as bllEmbeddings
 
 appName = "RzTextClassifier"
 # 1) Instala os hooks globais o quanto antes

@@ -1,4 +1,4 @@
-#search_ids_iguais.py
+#GenerateIdsIguaisCollindgsBLL.py
 import os
 from pathlib import Path
 import numpy as np
@@ -9,9 +9,9 @@ from tqdm import tqdm
 from sqlalchemy.orm import Session
 from common import print_with_time, print_error, get_localconfig
 from bll.idIguaisBll import IdIguaisBll as IdIguaisBllModule
-from bll.embeddings_generate import GenerateEmbeddingsModule
+from bll.embeddings_generateBll import GenerateEmbeddings
 from bll.idCollidingBll import IdCollidingBll as IdCollidingBllModule
-from bll.embeddings import EmbeddingsModule
+from bll.embeddingsBll import Embeddings
 import dbClasses.idIguais as idIguaisModule
 import dbClasses.idsColidentes as idCollidingModule
 
@@ -34,8 +34,8 @@ class GenerateIdsIguaisCollindgs:
         self.k = 50  # Number of nearest neighbors to search
         self.id_iguais_bll = IdIguaisBllModule(session)
         self.id_colliding_bll = IdCollidingBllModule(session)
-        self.generate_embeddings = GenerateEmbeddingsModule('train', session, localcfg)
-        self.embeddings_handler = EmbeddingsModule(localcfg)
+        self.generate_embeddings = GenerateEmbeddings('train', session, localcfg)
+        self.embeddings_handler = Embeddings(localcfg)
 
     def _fetch_data(self) -> list:        
         try:

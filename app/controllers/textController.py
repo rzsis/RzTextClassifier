@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 import common
 from fastapi import APIRouter
-import bll.embeddings as embeddingsModule
+import bll.embeddingsBll as embeddingsModule
 import bll.classifica_textoBll as classifica_textoBllModule    
 from common import get_db
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ def init():
     global bllEmbeddings    
     from main import localconfig  # importa localconfig do main.py    
     if bllEmbeddings is None:
-        bllEmbeddings = embeddingsModule.EmbeddingsModule(localconfig)  # inicializa modelos (carrega embeddings)
+        bllEmbeddings = embeddingsModule.Embeddings(localconfig)  # inicializa modelos (carrega embeddings)
         bllEmbeddings.load_model_and_embendings("train")  # carrega os embeddings finais
 
 #endpoint para classificação de texto

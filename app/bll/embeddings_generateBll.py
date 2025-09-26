@@ -12,7 +12,7 @@ from bll.idsduplicados import IdsDuplicados
 from sqlalchemy import text
 import localconfig
 
-class GenerateEmbeddingsModule:
+class GenerateEmbeddings:
     def __init__(self, split:str, session: Session, localcfg:localconfig):
         """
         Initialize the GenerateEmbeddings class.

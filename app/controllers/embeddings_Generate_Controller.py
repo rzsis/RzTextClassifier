@@ -6,8 +6,8 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 from fastapi import APIRouter
 from common import print_with_time, print_error, get_db, get_localconfig
-from bll.embeddings_generate import GenerateEmbeddingsModule as bllGenerateEmbeddings
-from bll.generate_ids_equal_colliding import GenerateIdsIguaisCollindgs as GenerateIdsIguaisCollindgsModule
+from bll.embeddings_generateBll import GenerateEmbeddings as bllGenerateEmbeddings
+from bll.generate_ids_equal_collidingBll import GenerateIdsIguaisCollindgs as GenerateIdsIguaisCollindgsModule
 router = APIRouter()
 
 #faz o treinamento a montagem do banco dos embeddings

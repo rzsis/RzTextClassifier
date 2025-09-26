@@ -18,7 +18,7 @@ import localconfig
 from pydantic import BaseModel
 from typing import List, Optional
 
-class EmbeddingsModule:
+class Embeddings:
     def __init__(self,localcfg:localconfig):
         self.localconfig = localcfg
 

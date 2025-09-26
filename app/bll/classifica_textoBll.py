@@ -3,14 +3,14 @@ from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
 import bll.log_ClassificacaoBll as log_ClassificacaoBllModule
-from bll.embeddings import EmbeddingsModule  # Importing the original module
+from bll.embeddingsBll import Embeddings  # Importing the original module
 from collections import defaultdict
 import faiss
 from transformers import AutoTokenizer
 from sqlalchemy.orm import Session
 
 class classifica_textoBll:
-    def __init__(self, embeddingsModule: EmbeddingsModule, session: Session):        
+    def __init__(self, embeddingsModule: Embeddings, session: Session):        
         self.embeddingsModule = embeddingsModule          
         self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)     
 
@@ -26,7 +26,6 @@ class classifica_textoBll:
         Classe: Optional[str]
         Quantidade: Optional[int]        
         Media: Optional[float]
-
 
     class ResultadoSimilaridade(BaseModel):
         IdEncontrado: Optional[int]
