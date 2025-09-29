@@ -86,7 +86,7 @@ class classifica_textoBll:
                     CodClasse=None,
                     Classe=f"Não encontrada similaridade superior {min_similarity*100}%",
                     Similaridade=None,
-                    Metodo=None,
+                    Metodo="N",
                     CodClasseMedia=None,
                     CodClasseQtd=None,
                     ListaSimilaridade=None,
@@ -165,7 +165,11 @@ class classifica_textoBll:
                         "Similaridade": None
                     }
             if gravar_log:
-                self.log_ClassificacaoBll.gravaLogClassificacao(item_pai["IdEncontrado"], id_a_classificar, metodo, TabelaOrigem)
+                self.log_ClassificacaoBll.gravaLogClassificacao(item_pai["IdEncontrado"], 
+                                                                id_a_classificar, 
+                                                                metodo, 
+                                                                TabelaOrigem,
+                                                                item_pai["CodClasse"])
 
             return self.ResultadoSimilaridade(
                 IdEncontrado=item_pai["IdEncontrado"],

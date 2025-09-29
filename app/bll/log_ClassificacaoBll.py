@@ -1,4 +1,5 @@
 #LogClassificacaoBll.py
+from typing import Optional
 from sqlalchemy import text
 from db_utils import Session
 from common import print_with_time, print_error
@@ -10,7 +11,7 @@ class LogClassificacaoBll:
         self.session = session
         self.logger = logger.log
 
-    def gravaLogClassificacao(self, id_referencia: int, id_classificado: int, metodo: str, tabela_origem: str):
+    def gravaLogClassificacao(self, id_referencia: int, id_classificado: int, metodo: str, tabela_origem: str, cod_classe_inferido: Optional[int]):
         """
         Inserts a classification log entry into the log_classificacao table.
 
@@ -23,8 +24,8 @@ class LogClassificacaoBll:
         try:
             session = self.session
             query = """
-                INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo)
-                VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo)
+                INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo, CodClasseInferido )
+                VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo, :cod_classe_inferido)
             """
             session.execute(
                 text(query),
@@ -33,7 +34,8 @@ class LogClassificacaoBll:
                     "id_classificado": id_classificado,
                     "data_hora": datetime.now(),
                     "tabela_origem": tabela_origem,
-                    "metodo": metodo
+                    "metodo": metodo,
+                    "cod_classe_inferido": cod_classe_inferido
                 }
             )
             session.commit()          
@@ -58,8 +60,8 @@ class LogClassificacaoBll:
         try:
             session = self.session            
             query = """
-                INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo)
-                VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo)
+                INSERT ignore INTO  log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo,CodClasseInferido)
+                VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo, :cod_classe_inferido)
             """
             
             # Process logs in chunks of BATCH_SIZE
@@ -71,7 +73,8 @@ class LogClassificacaoBll:
                         "id_classificado": log["IdAClassificar"],
                         "data_hora": datetime.now(),
                         "tabela_origem": log["TabelaOrigem"],
-                        "metodo": log["Metodo"]
+                        "metodo": log["Metodo"],
+                        "cod_classe_inferido": log["CodClasseInferido"]
                     }
                     for log in batch
                 ]

@@ -11,6 +11,7 @@ from common import print_with_time, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
+import logger
 
 class ClassificaTextosPendentesBll:
     def __init__(self, session: Session):
@@ -30,10 +31,10 @@ class ClassificaTextosPendentesBll:
             self.log_dir = "../log"
             self.field = "text"
             self.k = 20  # Number of nearest neighbors to search
-
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings,
                             session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
+            self.logger = logger.log            
 
 
 
@@ -49,8 +50,9 @@ class ClassificaTextosPendentesBll:
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
                 AND t.TxtTreinamento <> ''
+                and Classificado = false
                 ORDER BY t.id
-                limit 10
+                limit 1000
             """
         
             return self.session.execute(text(query)).mappings().all()
@@ -72,6 +74,43 @@ class ClassificaTextosPendentesBll:
             except Exception as e:
                 print_error(f"Erro ao gravar log de classificação para Id {result.IdEncontrado}: {e}")
                 continue
+
+    def grava_classificacao_textos_pendentes(self, itens_classificados: list[dict] ):
+        BATCH_SIZE = 100
+        try:
+            session = self.session            
+            query = """
+                Update textos_classificar set CodClasseInferido = :cod_classe_inferido , Similaridade = :similaridade, Metodo = :metodo, Classificado = true
+                where id = :id_classificado
+            """         
+                           
+            # Process logs in chunks of BATCH_SIZE
+            for i in range(0, len(itens_classificados), BATCH_SIZE):
+                batch = itens_classificados[i:i + BATCH_SIZE]
+                batch_params = [
+                    {
+                        "cod_classe_inferido": classificado["CodClasseInferido"],
+                        "similaridade": classificado["Similaridade"],
+                        "metodo": classificado["Metodo"],
+                        "id_classificado": classificado["IdAClassificar"]                        
+                    }
+                    for classificado in batch
+                ]
+                
+                try:
+                    # Execute batch insert
+                    session.execute(text(query), batch_params)
+                    session.commit()
+                    self.logger.info(f"Successfully committed batch of {len(batch)} classification logs")
+                except Exception as e:
+                    self.logger.error(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                    print_error(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                    session.rollback()
+                    continue
+        except Exception as e:
+            self.logger.error(f"Error processing batch classification logs: {e}")
+            print_error(f"Error processing batch classification logs: {e}")
+            session.rollback()            
 
 
     def classifica_textos_pendentes(self) -> list[classifica_textoBllModule.ResultadoSimilaridade]:
@@ -100,10 +139,15 @@ class ClassificaTextosPendentesBll:
                 "IdEncontrado": result.IdEncontrado,
                 "IdAClassificar": id_texto,
                 "Metodo": result.Metodo,
-                "TabelaOrigem": "T"
+                "TabelaOrigem": "T",
+                "CodClasseInferido": result.CodClasse,
+                "Similaridade": result.Similaridade
             })
             
         
+        self.grava_classificacao_textos_pendentes(lista_log_classificacao)
+
+
         self.log_ClassificacaoBll.gravaLogClassificacaoBatch(lista_log_classificacao)
 
         print_with_time(f"Processados {len(lista_resultado_similaridade)} textos a classificar pendentes concluído.")
