@@ -5,15 +5,15 @@ from pydantic import BaseModel
 from typing import Optional
 from fastapi.responses import JSONResponse
 from fastapi import APIRouter
-from common import print_with_time, print_error, get_db, get_localconfig
-from bll.embeddings_generateBll import GenerateEmbeddings as bllGenerateEmbeddings
+from common import print_with_time, print_error, get_session_db, get_localconfig
+from bll.embeddings_generateBll import Embeddings_GenerateBll as bllGenerateEmbeddings
 from bll.generate_ids_equal_collidingBll import GenerateIdsIguaisCollindgs as GenerateIdsIguaisCollindgsModule
 router = APIRouter()
 
 #faz o treinamento a montagem do banco dos embeddings
 @router.post("/generateembeddings")
 async def GenerateEmbeddings(split: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session_db),
     localcfg = Depends(get_localconfig),
 ):        
     try:        
@@ -30,7 +30,7 @@ async def GenerateEmbeddings(split: str,
 #endpoint para gerar ids iguais
 @router.post("/generate_ids_iguais")
 async def generate_ids_iguais(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session_db),
     localcfg = Depends(get_localconfig)
     ):
 
@@ -43,7 +43,7 @@ async def generate_ids_iguais(
 #endpoint para gerar ids colidentes
 @router.post("/generate_ids_colidentes")
 async def generate_ids_colidentes(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session_db),
     localcfg = Depends(get_localconfig)
     ):
 

@@ -1,13 +1,13 @@
 #LogClassificacaoBll.py
 from sqlalchemy import text
-from db_utils import Db
+from db_utils import Session
 from common import print_with_time, print_error
 import logger
 from datetime import datetime
 
 class LogClassificacaoBll:
-    def __init__(self, db: Db):
-        self.db = db
+    def __init__(self, session: Session):
+        self.session = session
         self.logger = logger.log
 
     def gravaLogClassificacao(self, id_referencia: int, id_classificado: int, metodo: str, tabela_origem: str):
@@ -21,7 +21,7 @@ class LogClassificacaoBll:
             tabela_origem (str): The origin of the text ('C', 'T', or 'A').
         """
         try:
-            session = self.db
+            session = self.session
             query = """
                 INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo)
                 VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo)
@@ -41,3 +41,53 @@ class LogClassificacaoBll:
             self.logger.error(f"Error inserting classification log (IdReferencia: {id_referencia}): {e}")
             print_error(f"Error inserting classification log (IdReferencia: {id_referencia}): {e}")
             session.rollback()
+
+    def gravaLogClassificacaoBatch(self, logs: list[dict]):
+        """
+        Inserts multiple classification log entries into the log_classificacao table in batches of 100,
+        committing each batch and any remaining records.
+
+        Args:
+            logs (list[dict]): List of dictionaries containing log data with keys:
+                IdEncontrado (int): The reference ID
+                IdAClassificar (int): The classified ID
+                Metodo (str): The classification method used
+                TabelaOrigem (str): The origin of the text ('C', 'T', or 'A')
+        """
+        BATCH_SIZE = 100
+        try:
+            session = self.session            
+            query = """
+                INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo)
+                VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo)
+            """
+            
+            # Process logs in chunks of BATCH_SIZE
+            for i in range(0, len(logs), BATCH_SIZE):
+                batch = logs[i:i + BATCH_SIZE]
+                batch_params = [
+                    {
+                        "id_referencia": log["IdEncontrado"],
+                        "id_classificado": log["IdAClassificar"],
+                        "data_hora": datetime.now(),
+                        "tabela_origem": log["TabelaOrigem"],
+                        "metodo": log["Metodo"]
+                    }
+                    for log in batch
+                ]
+                
+                try:
+                    # Execute batch insert
+                    session.execute(text(query), batch_params)
+                    session.commit()
+                    self.logger.info(f"Successfully committed batch of {len(batch)} classification logs")
+                except Exception as e:
+                    self.logger.error(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                    print_error(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                    session.rollback()
+                    continue
+                
+        except Exception as e:
+            self.logger.error(f"Error processing batch classification logs: {e}")
+            print_error(f"Error processing batch classification logs: {e}")
+            session.rollback()            

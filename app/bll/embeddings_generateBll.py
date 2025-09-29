@@ -8,11 +8,11 @@ import torch
 from tqdm import tqdm
 from common import  print_with_time, print_error
 from collections import Counter
-from bll.idsduplicadosBll import IdsDuplicados
+from bll.idsDuplicadosBll import IdsDuplicados
 from sqlalchemy import text
 import localconfig
 
-class GenerateEmbeddings:
+class Embeddings_GenerateBll:
     def __init__(self, split:str, session: Session, localcfg:localconfig):
         """
         Initialize the GenerateEmbeddings class.
@@ -132,7 +132,7 @@ class GenerateEmbeddings:
             AND not t.id in (Select id from idsduplicados)                        
             AND not t.id in (Select id from idsiguais)                                    
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
-            Order by COUNT(t.id) DESC  /*ordena para inserir duplicatas primeiro em idduplicados para para poder ignorar depois*/           
+            Order by COUNT(t.id),t.id DESC  /*ordena para inserir duplicatas primeiro em idduplicados para para poder ignorar depois*/           
         """
 
         # Fetch data from database

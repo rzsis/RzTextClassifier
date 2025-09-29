@@ -6,34 +6,33 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 import common
 from fastapi import APIRouter
-import bll.embeddingsBll as embeddingsModule
+import bll.embeddingsBll as embeddingsBllModule
 import bll.classifica_textoBll as classifica_textoBllModule    
-from common import get_db
+from common import get_session_db
 from sqlalchemy.orm import Session
+import bll.embeddingsBll as embeddingsBllModule
+from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as classifica_textos_pendentesBllModule
 
-bllEmbeddings = None
 
 router = APIRouter()
-
-def init():
-    global bllEmbeddings    
-    from main import localconfig  # importa localconfig do main.py    
-    if bllEmbeddings is None:
-        bllEmbeddings = embeddingsModule.Embeddings(localconfig)  # inicializa modelos (carrega embeddings)
-        bllEmbeddings.load_model_and_embendings("train")  # carrega os embeddings finais
+   
 
 #endpoint para classificação de texto
 @router.post("/classificaTexto")
 async def ClassificaTexto(texto: str,
                           id_a_classificar: Optional[int] = None,
                           TabelaOrigem:Optional[str] = "",
-                          db: Session = Depends(get_db)  ):    
+                          db: Session = Depends(get_session_db)  ):    
     # Executar script de restauração
-    init()  # inicializa bllEmbeddings se ainda não foi inicializado    
+    embeddingsBllModule.initBllEmbeddings()  # inicializa bllEmbeddings se ainda não foi inicializado  
 
     try:     
-        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(bllEmbeddings,db)
-        return classifica_textoBll.classifica_texto(texto,id_a_classificar,TabelaOrigem, top_k=20)
+        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(embeddingsBllModule.bllEmbeddings,db)
+        return classifica_textoBll.classifica_texto(texto,
+                                                    id_a_classificar,
+                                                    TabelaOrigem, 
+                                                    top_k=20, 
+                                                    gravar_log=True)
     
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
@@ -41,3 +40,14 @@ async def ClassificaTexto(texto: str,
 
     
 
+#endpoint para classificação de texto
+@router.post("/classifica_textos_pendentes")
+async def classifica_textos_pendentes(session: Session = Depends(get_session_db)  ):        
+
+    try:     
+        embeddingsBllModule.initBllEmbeddings()  # inicializa bllEmbeddings se ainda não foi inicializado          
+        classifica_textos_pendentesBll = classifica_textos_pendentesBllModule(session)
+        return classifica_textos_pendentesBll.classifica_textos_pendentes()
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")

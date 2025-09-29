@@ -35,10 +35,10 @@ def init_dependencies(appName: str):
     global _localconfig, _db
     localconfig.load_config(appName)         
     _localconfig = localconfig
-    _db = db_utils.Db(localconfig)   # cria engine + sessionmaker UMA vez
+    _db = db_utils.Session(localconfig)   # cria engine + sessionmaker UMA vez
     
 
-def get_db():
+def get_session_db():
     """
     Dependency function to provide a Session (não o objeto Db).
     """

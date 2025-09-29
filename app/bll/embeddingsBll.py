@@ -1,4 +1,4 @@
-#embeddings.py
+#embeddingsBll.py
 import os
 import json
 from pathlib import Path
@@ -18,7 +18,16 @@ import localconfig
 from pydantic import BaseModel
 from typing import List, Optional
 
-class Embeddings:
+bllEmbeddings = None
+
+def initBllEmbeddings():
+    global bllEmbeddings    
+    from main import localconfig  # importa localconfig do main.py    
+    if bllEmbeddings is None:
+        bllEmbeddings = EmbeddingsBll(localconfig)  # inicializa modelos (carrega embeddings)
+        bllEmbeddings.load_model_and_embendings("train")  # carrega os embeddings finais
+
+class EmbeddingsBll:
     def __init__(self,localcfg:localconfig):
         self.localconfig = localcfg
 

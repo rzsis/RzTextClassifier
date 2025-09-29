@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import localconfig
 
-class Db:
+class Session:
     def __init__(self,localcfg:localconfig):
         usuario: str = localcfg.get_db_user()
         senha: str = localcfg.get_db_password()

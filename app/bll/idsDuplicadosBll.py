@@ -1,11 +1,11 @@
 # db_idsduplicados.py
 from sqlalchemy import text
-from db_utils import Db
+from db_utils import Session
 from common import print_with_time, print_error
 import logger
 
 class IdsDuplicados:
-    def __init__(self, db: Db):
+    def __init__(self, db: Session):
         self.db = db
         self.logger = logger.log
 
