@@ -1,8 +1,11 @@
 #classifica_textoBll.py
+import re
 import string
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
+from requests import session
+from sqlalchemy import text
 import bll.log_ClassificacaoBll as log_ClassificacaoBllModule
 from bll.embeddingsBll import EmbeddingsBll  # Importing the original module
 from collections import defaultdict
@@ -13,7 +16,8 @@ from sqlalchemy.orm import Session
 class classifica_textoBll:
     def __init__(self, embeddingsModule: EmbeddingsBll, session: Session):        
         self.embeddingsModule = embeddingsModule          
-        self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)     
+        self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)
+        self.session = session  
 
     # Pydantic model classes
     class ItemSimilar(BaseModel):
@@ -38,9 +42,10 @@ class classifica_textoBll:
         CodClasseQtd: Optional[int]
         ListaSimilaridade: Optional[List['classifica_textoBll.ItemSimilar']]
         ListaClassesInfo: Optional[List['classifica_textoBll.ClassesInfo']]        
+    
 
     #obtem o id com maior similaridade para a codclasse
-    def get_best_id_by_codclasse(self, results: List[dict], cod_classe: int) -> Optional[int]:
+    def _get_best_id_by_codclasse(self, results: List[dict], cod_classe: int) -> Optional[int]:
         max_sim_item = max([result for result in results 
                                     if result["CodClasse"] == cod_classe],
                                     key=lambda x: x["Similaridade"],
@@ -105,8 +110,9 @@ class classifica_textoBll:
 
             for result in results:
                 if result["Similaridade"] >= 0.97 and metodo != "E":
-                    metodo = "E"
+                    metodo = "E"                    
                     item_pai = result
+                    
 
                 cod_classe = result["CodClasse"]
                 medias_por_classe[cod_classe].append(result["Similaridade"])
@@ -142,7 +148,7 @@ class classifica_textoBll:
                     # Find the item in results with the highest Similaridade for the CodClasse with the highest Media                                     
                     metodo = "M"
                     item_pai = {
-                        "IdEncontrado": self.get_best_id_by_codclasse(results, maior_item_media.CodClasse),
+                        "IdEncontrado": self._get_best_id_by_codclasse(results, maior_item_media.CodClasse),
                         "CodClasse": maior_item_media.CodClasse,
                         "Classe" : maior_item_media.Classe,
                         "Similaridade": maior_item_media.Media
@@ -151,7 +157,7 @@ class classifica_textoBll:
                     # Find the item in results with the highest Qtd for the CodClasse with the highest Qtd                
                     metodo = "Q"
                     item_pai = {
-                        "IdEncontrado":self.get_best_id_by_codclasse(results, maior_item_qtd.CodClasse),
+                        "IdEncontrado":self._get_best_id_by_codclasse(results, maior_item_qtd.CodClasse),
                         "CodClasse": maior_item_qtd.CodClasse,
                         "Classe" : maior_item_qtd.Classe,
                         "Similaridade": maior_item_qtd.Media

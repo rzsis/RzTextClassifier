@@ -41,7 +41,25 @@ class ClassificaTextosPendentesBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
         
+    def _get_Textos_Pendentes(self) -> list:        
+        try:
+            query = """
+                SELECT Count(t.id) AS TotalTextosPendentes
+                FROM textos_classificar t    
+                WHERE t.Classificado = false
+                and t.TxtTreinamento IS NOT NULL
+                AND t.TxtTreinamento <> ''
+                and Classificado = false
+                ORDER BY t.id                
+            """
         
+            return self.session.execute(text(query)).mappings().all()
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ontendo _get_Textos_Pendentes: {e}")            
+
+
+
     def _fetch_data(self) -> list:        
         try:
             query = """
@@ -61,7 +79,7 @@ class ClassificaTextosPendentesBll:
             raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")            
 
 
-    def commit_log_classificacao(self , results : list[classifica_textoBllModule.ResultadoSimilaridade] ):
+    def _commit_log_classificacao(self , results : list[classifica_textoBllModule.ResultadoSimilaridade] ):
         lista_log_classificacao = []
         for result in results:
             try:
@@ -75,7 +93,7 @@ class ClassificaTextosPendentesBll:
                 print_error(f"Erro ao gravar log de classificação para Id {result.IdEncontrado}: {e}")
                 continue
 
-    def grava_classificacao_textos_pendentes(self, itens_classificados: list[dict] ):
+    def _grava_classificacao_textos_pendentes(self, itens_classificados: list[dict] ):
         BATCH_SIZE = 100
         try:
             session = self.session            
@@ -119,7 +137,7 @@ class ClassificaTextosPendentesBll:
         """
         print_with_time(f"Iniciando processamento para classificação de textos a classificar pendentes...")
 
-        embeddingsBllModule.initBllEmbeddings()  # inicializa bllEmbeddings se ainda não foi inicializado
+        embeddingsBllModule.initBllEmbeddings(self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
         
         # Load data from database
         data = self._fetch_data()
@@ -145,11 +163,15 @@ class ClassificaTextosPendentesBll:
             })
             
         
-        self.grava_classificacao_textos_pendentes(lista_log_classificacao)
-
+        self._grava_classificacao_textos_pendentes(lista_log_classificacao)
 
         self.log_ClassificacaoBll.gravaLogClassificacaoBatch(lista_log_classificacao)
 
-        print_with_time(f"Processados {len(lista_resultado_similaridade)} textos a classificar pendentes concluído.")
+        sucessMessage = f"Processados {len(lista_log_classificacao)} textos a classificar pendentes."
+        print_with_time(sucessMessage)
     
-        return lista_resultado_similaridade
+        return {
+            "status": "OK",
+            "processados": sucessMessage,
+            "restate": f"Restam {self._get_Textos_Pendentes()[0]['TotalTextosPendentes'] } textos a classificar pendentes."
+        }

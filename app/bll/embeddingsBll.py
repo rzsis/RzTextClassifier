@@ -11,24 +11,33 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 from tqdm import tqdm
 from datetime import datetime
+from bll import ids_e_classes_corretasBll
 from common import print_with_time
 from collections import defaultdict
 import csv
+from db_utils import Session
 import localconfig
 from pydantic import BaseModel
 from typing import List, Optional
+import bll.ids_e_classes_corretasBll  as IdsEClassesCorretasBllModule
 
 bllEmbeddings = None
 
-def initBllEmbeddings():
+def initBllEmbeddings(session=Session):
     global bllEmbeddings    
-    from main import localconfig  # importa localconfig do main.py    
     if bllEmbeddings is None:
-        bllEmbeddings = EmbeddingsBll(localconfig)  # inicializa modelos (carrega embeddings)
-        bllEmbeddings.load_model_and_embendings("train")  # carrega os embeddings finais
+        try:
+            from main import localconfig  # importa localconfig do main.py                
+            bllEmbeddings = EmbeddingsBll()  # inicializa modelos (carrega embeddings)
+            bllEmbeddings.load_model_and_embendings("train",session)  # carrega os embeddings finais        
+        except Exception as e:
+            raise RuntimeError(f"Erro Inicializando bllEmbeddings: {e}")            
+
+        
 
 class EmbeddingsBll:
-    def __init__(self,localcfg:localconfig):
+    def __init__(self):
+        from main import localconfig as localcfg  # importa localconfig do main.py            
         self.localconfig = localcfg
 
     # Função para gerar embedding para comparação do texto, transformando o texto em um vetor numérico
@@ -54,7 +63,7 @@ class EmbeddingsBll:
 
     #Inicializa os modelos e carrega os embeddings
     #embedding_type pode ser train ou final
-    def load_model_and_embendings(self, embedding_type: str):              
+    def load_model_and_embendings(self, embedding_type: str,session: Session) -> tuple[np.ndarray, np.ndarray]:              
 
         # define os caminhos dos arquivos de embeddings e metadados
         if embedding_type == "train":
@@ -103,10 +112,16 @@ class EmbeddingsBll:
         if len(self.embeddings) != len(ids) or len(self.embeddings) != len(CodClasse) or len(self.embeddings) != len(Classes):
             raise RuntimeError(f"Erro: Inconsistência entre embeddings ({len(self.embeddings)}) e metadados "
                             f"(ids: {len(ids)}, CodClasse: {len(CodClasse)}, Texts: {len(Classes)})")                 
-        
+                                         
+        #idsEClassesCorretasBll = IdsEClassesCorretasBllModule.IdsEClassesCorretasBll(session)  # inicializa idsEClassesCorretasBll
+        #self.metadata = idsEClassesCorretasBll.corrige_metadata(self.metadata)
+
+
         # Normalizar embeddings de referência e criar índice FAISS usando normalize_embeddings
         self.embeddings = self.normalize_embeddings(self.embeddings, "embeddings de referência")
+
         print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")    
+
         return self.embeddings, self.metadata    
 
 

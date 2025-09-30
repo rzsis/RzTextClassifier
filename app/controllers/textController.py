@@ -22,12 +22,12 @@ router = APIRouter()
 async def ClassificaTexto(texto: str,
                           id_a_classificar: Optional[int] = None,
                           TabelaOrigem:Optional[str] = "",
-                          db: Session = Depends(get_session_db)  ):    
+                          session: Session = Depends(get_session_db)  ):    
     # Executar script de restauração
-    embeddingsBllModule.initBllEmbeddings()  # inicializa bllEmbeddings se ainda não foi inicializado  
+    embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado  
 
     try:     
-        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(embeddingsBllModule.bllEmbeddings,db)
+        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(embeddingsBllModule.bllEmbeddings,session)
         return classifica_textoBll.classifica_texto(texto,
                                                     id_a_classificar,
                                                     TabelaOrigem, 
@@ -45,7 +45,7 @@ async def ClassificaTexto(texto: str,
 async def classifica_textos_pendentes(session: Session = Depends(get_session_db)  ):        
 
     try:     
-        embeddingsBllModule.initBllEmbeddings()  # inicializa bllEmbeddings se ainda não foi inicializado          
+        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         classifica_textos_pendentesBll = classifica_textos_pendentesBllModule(session)
         return classifica_textos_pendentesBll.classifica_textos_pendentes()
         
