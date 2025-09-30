@@ -103,6 +103,9 @@ class EmbeddingsBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar embeddings ou metadados para {embeddings_file.stem}: {e}")            
 
+        # Convert NpzFile to dict to improve perfomance
+        self.metadata = {key: self.metadata[key] for key in self.metadata}
+
         ids = self.metadata["Id"]
         Classes = self.metadata["Classe"]
         CodClasse = self.metadata["CodClasse"].astype(int)
@@ -112,9 +115,10 @@ class EmbeddingsBll:
         if len(self.embeddings) != len(ids) or len(self.embeddings) != len(CodClasse) or len(self.embeddings) != len(Classes):
             raise RuntimeError(f"Erro: Inconsistência entre embeddings ({len(self.embeddings)}) e metadados "
                             f"(ids: {len(ids)}, CodClasse: {len(CodClasse)}, Texts: {len(Classes)})")                 
-                                         
-        #idsEClassesCorretasBll = IdsEClassesCorretasBllModule.IdsEClassesCorretasBll(session)  # inicializa idsEClassesCorretasBll
-        #self.metadata = idsEClassesCorretasBll.corrige_metadata(self.metadata)
+
+
+        idsEClassesCorretasBll = IdsEClassesCorretasBllModule.IdsEClassesCorretasBll(session)  # inicializa idsEClassesCorretasBll
+        self.metadata = idsEClassesCorretasBll.corrige_metadata(self.metadata)
 
 
         # Normalizar embeddings de referência e criar índice FAISS usando normalize_embeddings

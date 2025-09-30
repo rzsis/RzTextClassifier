@@ -70,7 +70,7 @@ class ClassificaTextosPendentesBll:
                 AND t.TxtTreinamento <> ''
                 and Classificado = false
                 ORDER BY t.id
-                limit 1000
+                /* limit 5000  */
             """
         
             return self.session.execute(text(query)).mappings().all()
