@@ -70,7 +70,7 @@ class ClassificaTextosPendentesBll:
                 AND t.TxtTreinamento <> ''
                 and Classificado = false
                 ORDER BY t.id
-                /* limit 5000  */
+                limit 2000
             """
         
             return self.session.execute(text(query)).mappings().all()
@@ -98,7 +98,8 @@ class ClassificaTextosPendentesBll:
         try:
             session = self.session            
             query = """
-                Update textos_classificar set CodClasseInferido = :cod_classe_inferido , Similaridade = :similaridade, Metodo = :metodo, Classificado = true
+                Update textos_classificar set CodClasseInferido = :cod_classe_inferido , Similaridade = :similaridade, Metodo = :metodo,IdReferencia = :id_referencia,
+                Classificado = true
                 where id = :id_classificado
             """         
                            
@@ -110,7 +111,8 @@ class ClassificaTextosPendentesBll:
                         "cod_classe_inferido": classificado["CodClasseInferido"],
                         "similaridade": classificado["Similaridade"],
                         "metodo": classificado["Metodo"],
-                        "id_classificado": classificado["IdAClassificar"]                        
+                        "id_classificado": classificado["IdAClassificar"],                        
+                        "id_referencia": classificado["IdEncontrado"]                            
                     }
                     for classificado in batch
                 ]
@@ -141,8 +143,7 @@ class ClassificaTextosPendentesBll:
         
         # Load data from database
         data = self._fetch_data()
-
-        lista_resultado_similaridade : list[classifica_textoBllModule.ResultadoSimilaridade] = []
+        
         lista_log_classificacao = []
 
         for row in tqdm(data, desc="Processando textos a classificar pendentes"):
@@ -151,8 +152,7 @@ class ClassificaTextosPendentesBll:
             result = self.classifica_textoBll.classifica_texto( texto,
                                                                 id_a_classificar=id_texto,
                                                                 TabelaOrigem="T",
-                                                                top_k=20)
-            lista_resultado_similaridade.append(result)
+                                                                top_k=20)            
             lista_log_classificacao.append({
                 "IdEncontrado": result.IdEncontrado,
                 "IdAClassificar": id_texto,
