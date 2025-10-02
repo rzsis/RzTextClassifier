@@ -1,0 +1,211 @@
+{
+	"info": {
+		"_postman_id": "0bea9b58-aad7-417d-9a9e-2d03da9d15b0",
+		"name": "RzIaStudio",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "3751590"
+	},
+	"item": [
+		{
+			"name": "ClassificaTexto_RzIA",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/classificaTexto?texto=INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se.",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"classificaTexto"
+					],
+					"query": [
+						{
+							"key": "texto",
+							"value": "INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se."
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ClassificaTexto_PendentesRzIA",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/classificaTexto?texto=INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se.",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"classificaTexto"
+					],
+					"query": [
+						{
+							"key": "texto",
+							"value": "INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se."
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ClassificaTexto_Servidor",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/classificaTexto?texto=DESPACHO/DECISÃO Vistos.Concedo a gratuidade judiciária ao executado {pessoa}, na forma do art. 98 doCPC.Da exceção de pré-executividade oposta {evento}, oportunizo vista ao exequente. Após, voltem conclusos. Diligências legais.",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"classificaTexto"
+					],
+					"query": [
+						{
+							"key": "texto",
+							"value": "DESPACHO/DECISÃO Vistos.Concedo a gratuidade judiciária ao executado {pessoa}, na forma do art. 98 doCPC.Da exceção de pré-executividade oposta {evento}, oportunizo vista ao exequente. Após, voltem conclusos. Diligências legais."
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "generateembeddings",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/generateembeddings?split=train",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"generateembeddings"
+					],
+					"query": [
+						{
+							"key": "split",
+							"value": "train"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "generate_ids_iguais",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/generate_ids_iguais",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"generate_ids_iguais"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "generate_ids_colidentes",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/generate_ids_colidentes",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"generate_ids_colidentes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "qdrant_get_collections",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:6333/collections",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "6333",
+					"path": [
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "qdrant_delete_collections",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:6333/collections/v146_textos_classificar",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "6333",
+					"path": [
+						"collections",
+						"v146_textos_classificar"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
