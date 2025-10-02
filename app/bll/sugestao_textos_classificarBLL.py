@@ -41,7 +41,7 @@ class sugestao_textos_classificarBll:
 
             self.qdrant_utils = Qdrant_UtilsModule()
             self.qdrant_client = self.qdrant_utils.get_client()            
-            self.qdrant_utils.create_collection(self.collection_name)
+            self.qdrant_utils.create_collection(self.collection_name,self.embedding_dim)
 
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
@@ -91,7 +91,7 @@ class sugestao_textos_classificarBll:
         try:
             embedding = embedding.astype('float32')
             faiss.normalize_L2(embedding)
-            point = PointStruct(id=str(id_texto), vector=embedding.flatten().tolist(), payload={"id": id_texto})
+            point = PointStruct(id=id_texto, vector=embedding.flatten().tolist(), payload={"id": id_texto})
             self.qdrant_client.upsert(
                 collection_name=self.collection_name,
                 points=[point]
