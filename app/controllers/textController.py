@@ -12,7 +12,7 @@ from common import get_session_db
 from sqlalchemy.orm import Session
 import bll.embeddingsBll as embeddingsBllModule
 from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as classifica_textos_pendentesBllModule
-
+from bll.sugestao_textos_classificarBLL import sugestao_textos_classificarBll as sugestao_textos_classificarBllModule
 
 router = APIRouter()
    
@@ -51,3 +51,15 @@ async def classifica_textos_pendentes(session: Session = Depends(get_session_db)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
+    
+#endpoint para sugere textos a classificar
+@router.post("/sugere_textos_classificar")
+async def sugere_textos_classificar(session: Session = Depends(get_session_db)  ):        
+
+    try:     
+        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        sugestao_textos_classificarBll = sugestao_textos_classificarBllModule(session)
+        return sugestao_textos_classificarBll.indexa_e_classifica_textos_pendentes()
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    

@@ -5,7 +5,7 @@
   "python.analysis.indexing": true,
   "python.analysis.autoImportCompletions": true,
   "python.analysis.completeFunctionParens": true,
-  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.typeCheckingMode": "standard",
   "python.analysis.diagnosticSeverityOverrides": {
     "typeCheckingMode": "basic",  // ou "off"    
     "reportArgumentType": "none",

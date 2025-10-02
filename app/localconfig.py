@@ -34,6 +34,8 @@ def checkRequiredKeys():
         "dataset_path",
         "batch_size",
         "max_length",
+        "vectordatabasehost",
+        "codcli"
     ]
 
     missing_keys = [key for key in required_keys if key not in __configReaded]
@@ -73,7 +75,7 @@ def getModelName() -> str:
     model_path = Path(__configReaded["model_path"])
     return model_path.name
 
-def getModelPath() -> str:
+def getModelPath() -> Path:
     model_path = Path(__configReaded["model_path"])
     return model_path
 
@@ -82,4 +84,7 @@ def getEmbendingFinal() -> str:
 
 def getEmbeddingsTrain() -> str:
     return os.path.join(__configReaded["embeddingsTrain"], getModelName())
+
+def get(chave) -> str:
+    return __configReaded[chave]
 
