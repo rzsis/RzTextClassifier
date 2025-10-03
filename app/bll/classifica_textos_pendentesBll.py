@@ -1,9 +1,11 @@
 #classifica_textos_pendentesBll.py
+import json
 import os
 from pathlib import Path
+from typing import Any, List
 import numpy as np
 import faiss
-from sqlalchemy import text
+from sqlalchemy import RowMapping, Sequence, text
 from sympy import Id
 from tqdm import tqdm
 from sqlalchemy.orm import Session
@@ -41,7 +43,7 @@ class ClassificaTextosPendentesBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
         
-    def _get_Textos_Pendentes(self) -> list:        
+    def _get_Textos_Pendentes(self) -> int:        
         try:
             query = """
                 SELECT Count(t.id) AS TotalTextosPendentes
@@ -51,29 +53,27 @@ class ClassificaTextosPendentesBll:
                 AND t.TxtTreinamento <> ''
                 and Classificado = false
                 ORDER BY t.id                
-            """
-        
-            return self.session.execute(text(query)).mappings().all()
+            """            
+            return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
 
         except Exception as e:
             raise RuntimeError(f"Erro ontendo _get_Textos_Pendentes: {e}")            
 
 
 
-    def _fetch_data(self) -> list:        
+    def _fetch_data(self) -> List[RowMapping]:        
         try:
             query = """
                 SELECT t.id,t.TxtTreinamento AS Text                   
                 FROM textos_classificar t            
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
-                AND t.TxtTreinamento <> ''
-                and Classificado = false
+                AND t.TxtTreinamento <> ''                
                 ORDER BY t.id
                 limit 2000
             """
         
-            return self.session.execute(text(query)).mappings().all()
+            return self.session.execute(text(query)).mappings().all() # pyright: ignore[reportReturnType]
 
         except Exception as e:
             raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")            
@@ -95,8 +95,8 @@ class ClassificaTextosPendentesBll:
 
     def _grava_classificacao_textos_pendentes(self, itens_classificados: list[dict] ):
         BATCH_SIZE = 100
-        try:
-            session = self.session            
+        session = self.session         
+        try:           
             query = """
                 Update textos_classificar set CodClasseInferido = :cod_classe_inferido , Similaridade = :similaridade, Metodo = :metodo,IdReferencia = :id_referencia,
                 Classificado = true
@@ -133,7 +133,7 @@ class ClassificaTextosPendentesBll:
             session.rollback()            
 
 
-    def classifica_textos_pendentes(self) -> list[classifica_textoBllModule.ResultadoSimilaridade]:
+    def classifica_textos_pendentes(self) -> dict[str, Any]:
         """
         Start processing the dataset.
         """
@@ -173,5 +173,5 @@ class ClassificaTextosPendentesBll:
         return {
             "status": "OK",
             "processados": sucessMessage,
-            "restate": f"Restam {self._get_Textos_Pendentes()[0]['TotalTextosPendentes'] } textos a classificar pendentes."
+            "restate": f"Restam {self._get_Textos_Pendentes()} textos a classificar pendentes."
         }

@@ -39,6 +39,8 @@ class EmbeddingsBll:
     def __init__(self):
         from main import localconfig as localcfg  # importa localconfig do main.py            
         self.localconfig = localcfg
+        os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
+        os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions        
 
     # Função para gerar embedding para comparação do texto, transformando o texto em um vetor numérico
     def generate_embedding(self, text: str) -> np.ndarray:
@@ -126,25 +128,12 @@ class EmbeddingsBll:
 
         print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")    
 
-        return self.embeddings, self.metadata    
+        return self.embeddings, self.metadata     # pyright: ignore[reportReturnType]
 
 
                 
     #normaliza os embeddings para poder comparar
-    def normalize_embeddings(self, embeddings: np.ndarray, context: str = "embeddings") -> np.ndarray:
-        """
-        Normaliza os embeddings fornecidos, cria um índice FAISS e o armazena em self.index.
-        
-        Args:
-            embeddings (np.ndarray): Array de embeddings a serem normalizados.
-            context (str): Descrição do contexto para mensagens de erro (ex: 'embeddings de referência').
-        
-        Returns:
-            np.ndarray: Embeddings normalizados.
-        
-        Raises:
-            RuntimeError: Se houver valores inválidos (NaN/Inf) ou falha na criação do índice.
-        """
+    def normalize_embeddings(self, embeddings: np.ndarray, context: str = "embeddings") -> np.ndarray:        
         try:
             # Verificar se há NaN ou Inf nos embeddings
             if np.any(np.isnan(embeddings)) or np.any(np.isinf(embeddings)):
@@ -161,7 +150,7 @@ class EmbeddingsBll:
             # Criar índice FAISS (mantido na CPU)
             self.dim = embeddings.shape[1]
             self.index = faiss.IndexFlatIP(self.dim)  # Inner Product para cosine similarity
-            self.index.add(embeddings)
+            self.index.add(embeddings) # pyright: ignore[reportCallIssue]
 
             # Verificar se todos os vetores foram adicionados ao índice
             if self.index.ntotal != len(embeddings):

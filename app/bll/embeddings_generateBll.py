@@ -104,14 +104,14 @@ class Embeddings_GenerateBll:
             truncation=True,
             max_length=self.max_length,
             padding=True
-        ).to(self.model.device)
+        ).to(self.model.device) # pyright: ignore[reportOptionalCall]
 
         with torch.no_grad():
             if torch.cuda.is_available():
                 with torch.autocast(device_type='cuda'):
-                    outputs = self.model(**inputs)
+                    outputs = self.model(**inputs) # pyright: ignore[reportOptionalCall]
             else:
-                outputs = self.model(**inputs)
+                outputs = self.model(**inputs) # pyright: ignore[reportOptionalCall]
 
             embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
 

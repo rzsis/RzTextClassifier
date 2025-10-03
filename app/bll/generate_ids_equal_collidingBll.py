@@ -35,7 +35,7 @@ class GenerateIdsIguaisCollindgs:
         self.id_iguais_bll = IdIguaisBllModule(session)
         self.id_colliding_bll = IdCollidingBllModule(session)
         self.generate_embeddings = Embeddings_GenerateBll('train', session, localcfg)
-        self.embeddings_handler = EmbeddingsBll(localcfg)
+        self.embeddings_handler = EmbeddingsBll()
 
     def _fetch_data(self) -> list:        
         try:
@@ -46,7 +46,7 @@ class GenerateIdsIguaisCollindgs:
 
     def _load_embeddings_and_metadata(self) -> tuple:
         try:
-            embeddings, metadata = self.embeddings_handler.load_model_and_embendings("train")  # Load training embeddings
+            embeddings, metadata = self.embeddings_handler.load_model_and_embendings("train",self.session)  # Load training embeddings
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar embeddings e metadados: {e}")            
 
@@ -96,7 +96,7 @@ class GenerateIdsIguaisCollindgs:
         try:
             dimension = embeddings.shape[1]
             index = faiss.IndexFlatIP(dimension)
-            index.add(embeddings)
+            index.add(embeddings) # pyright: ignore[reportCallIssue]
         except Exception as e:            
             raise RuntimeError(f"Erro ao criar ou adicionar ao índice Faiss: {e}")
 
@@ -119,7 +119,7 @@ class GenerateIdsIguaisCollindgs:
             # Perform k-NN search
             try:
                 query_embedding = embeddings[id_to_index[id_tram]:id_to_index[id_tram]+1]
-                distances, indices = index.search(query_embedding, self.k)
+                distances, indices = index.search(query_embedding, self.k) # pyright: ignore[reportCallIssue]
             except Exception as e:
                 print_with_time(f"Erro ao buscar k-NN para Id {id_tram}: {e}")
                 continue
@@ -223,7 +223,7 @@ class GenerateIdsIguaisCollindgs:
         try:
             dimension = embeddings.shape[1]
             index = faiss.IndexFlatIP(dimension)
-            index.add(embeddings)
+            index.add(embeddings) # pyright: ignore[reportCallIssue]
         except Exception as e:            
             raise RuntimeError(f"Erro ao criar ou adicionar ao índice Faiss: {e}")
 
@@ -246,7 +246,7 @@ class GenerateIdsIguaisCollindgs:
             # Perform k-NN search
             try:
                 query_embedding = embeddings[id_to_index[id_tram]:id_to_index[id_tram]+1]
-                distances, indices = index.search(query_embedding, self.k)
+                distances, indices = index.search(query_embedding, self.k) # pyright: ignore[reportCallIssue]
             except Exception as e:
                 print_with_time(f"Erro ao buscar k-NN para Id {id_tram}: {e}")
                 continue

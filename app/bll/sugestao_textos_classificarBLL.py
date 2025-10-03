@@ -1,4 +1,3 @@
-# sugestao_textos_classificarBll.py
 import os
 from pathlib import Path
 import numpy as np
@@ -16,6 +15,7 @@ from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
 import faiss
 from collections.abc import Sequence
+import torch
 
 class sugestao_textos_classificarBll:
     def __init__(self, session: Session):
@@ -28,45 +28,46 @@ class sugestao_textos_classificarBll:
             from main import localconfig as localcfg
             self.session = session
             self.localconfig = localcfg
-            self.config = localcfg.read_config()                                                
+            self.config = localcfg.read_config()
             self.collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
             self.k = 20
             self.similarity_threshold = 0.95
             self.min_similars = 3
-            self.clusters = {}  # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
+            self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
             embeddingsBllModule.initBllEmbeddings(self.session)
             self.embedding_dim = embeddingsBllModule.bllEmbeddings.dim
-
-
             self.qdrant_utils = Qdrant_UtilsModule()
-            self.qdrant_client = self.qdrant_utils.get_client()            
-            self.qdrant_utils.create_collection(self.collection_name,self.embedding_dim)
-
+            self.qdrant_client = self.qdrant_utils.get_client()
+            self.qdrant_utils.create_collection(self.collection_name, self.embedding_dim)
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
 
+    #obtem a quantidade de textos pendentes
     def _get_Textos_Pendentes(self) -> Sequence[RowMapping]:
         try:
             query = """
                 SELECT Count(t.id) AS TotalTextosPendentes
                 FROM textos_classificar t
                 WHERE Indexado = false
+                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                
                 ORDER BY t.id
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
 
+    #obtem os dados a serem indexados
     def _fetch_data(self) -> Sequence[RowMapping]:
         try:
             query = """
                 SELECT t.id, t.TxtTreinamento AS Text
                 FROM textos_classificar t
                 WHERE Indexado = false
+                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
                 ORDER BY t.id
                 LIMIT 2000
             """
@@ -74,6 +75,7 @@ class sugestao_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")
 
+    #depois de processado marca como indexado
     def _mark_as_indexado(self, id_texto: int):
         try:
             query = """
@@ -87,7 +89,27 @@ class sugestao_textos_classificarBll:
             self.logger.error(f"Erro ao marcar texto como indexado (id: {id_texto}): {e}")
             self.session.rollback()
 
-    def _insert_qdrant(self, id_texto: int, embedding: np.ndarray):
+    def _mark_lista_as_indexado(self, processados: list[dict]):
+        try:
+            # Filtra apenas os registros com UpInsertOk=True
+            ids_to_update = [item['Id'] for item in processados if item['UpInsertOk']]
+            if not ids_to_update:
+               print_with_time("Nenhum texto para marcar como indexado.")
+               return
+
+            query = """
+                UPDATE textos_classificar
+                SET indexado = true
+                WHERE id IN :ids
+            """
+            self.session.execute(text(query), {"ids": tuple(ids_to_update)})
+            self.session.commit()
+            self.logger.info(f"Marcados {len(ids_to_update)} textos como indexados em lote.")
+        except Exception as e:
+            self.logger.error(f"Erro ao marcar textos como indexados em lote: {e}")
+            self.session.rollback()
+
+    def _insert_texto_qdrant(self, id_texto: int, embedding: np.ndarray):
         try:
             embedding = embedding.astype('float32')
             faiss.normalize_L2(embedding)
@@ -96,10 +118,43 @@ class sugestao_textos_classificarBll:
                 collection_name=self.collection_name,
                 points=[point]
             )
-            self.logger.info(f"Vetor inserido no Qdrant para id {id_texto}")
         except Exception as e:
             self.logger.error(f"Erro ao inserir vetor no Qdrant para id {id_texto}: {e}")
             raise
+
+    def _insert_lista_texto_qdrant(self, processed_data: list[dict]) -> list[dict]:
+        try:
+            points = []
+            for item in tqdm(processed_data, desc="Inserindo dados no Qdrant"):
+                embedding = item['Embedding'].astype('float32')
+                faiss.normalize_L2(embedding)
+                points.append(PointStruct(
+                    id=item['Id'],
+                    vector=embedding.flatten().tolist(),
+                    payload={"id": item['Id']}
+                ))
+            
+            result = self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+            
+            # Verifica se a operação foi bem-sucedida
+            if result.status == "completed":
+                for item in processed_data:
+                    item['UpInsertOk'] = True
+                self.logger.info(f"Inseridos {len(processed_data)} textos no Qdrant com sucesso.")
+            else:
+                for item in processed_data:
+                    item['UpInsertOk'] = False
+                self.logger.error(f"Falha ao inserir textos no Qdrant: status {result.status}")
+            
+            return processed_data
+        except Exception as e:
+            self.logger.error(f"Erro ao inserir lista de textos no Qdrant: {e}")
+            for item in processed_data:
+                item['UpInsertOk'] = False
+            return processed_data
 
     def _search_qdrant(self, embedding: np.ndarray, id_texto: int) -> list[dict]:
         try:
@@ -124,112 +179,52 @@ class sugestao_textos_classificarBll:
             self.logger.error(f"Erro ao buscar similares no Qdrant para id {id_texto}: {e}")
             return []
 
-    def _check_existing_ids(self, high_similars: list[dict]) -> tuple[set, set]:
-        try:
-            ids = [similar["id"] for similar in high_similars]
-            if not ids:
-                return set(), set()
-            query = """
-                SELECT IdBase FROM sugestao_textos_classificar WHERE IdBase IN :ids
-                UNION
-                SELECT IdSimilar FROM sugestao_textos_classificar WHERE IdSimilar IN :ids
-            """
-            result = self.session.execute(text(query), {"ids": tuple(ids)}).fetchall()
-            id_bases = set(row[0] for row in result if row[0] in [similar["id"] for similar in high_similars])
-            id_similars = set(row[0] for row in result if row[0] not in id_bases)
-            return id_bases, id_similars
-        except Exception as e:
-            self.logger.error(f"Erro ao checar IDs existentes: {e}")
-            return set(), set()
-
-    def _update_clusters(self, id_texto: int, high_similars: list[dict]):
-        id_bases, id_similars = self._check_existing_ids(high_similars)
-        if id_bases:
-            max_score_id = max(
-                (similar for similar in high_similars if similar["id"] in id_bases),
-                key=lambda x: x["score"],
-                default=None
-            )
-            if max_score_id and max_score_id["score"] >= self.similarity_threshold:
-                id_base = max_score_id["id"]
-                if id_base not in self.clusters:
-                    self.clusters[id_base] = []
-                self.clusters[id_base].append({"id": id_texto, "score": max_score_id["score"]})
-                for similar in high_similars:
-                    if similar["id"] != max_score_id["id"] and similar["id"] not in id_similars and similar["score"] >= self.similarity_threshold:
-                        self.clusters[id_base].append({"id": similar["id"], "score": similar["score"]})
-        else:
-            if id_texto not in self.clusters:
-                self.clusters[id_texto] = []
-            for similar in high_similars:
-                if similar["id"] not in id_similars and similar["score"] >= self.similarity_threshold:
-                    self.clusters[id_texto].append({"id": similar["id"], "score": similar["score"]})
-
-    def _insert_clusters_to_db(self):
-        try:
-            BATCH_SIZE = 100
-            batch_params = []
-            for id_base, similars in self.clusters.items():
-                for similar in similars:
-                    batch_params.append({
-                        "id_base": id_base,
-                        "id_similar": similar["id"],
-                        "similaridade": similar["score"]
-                    })
-
-            if batch_params:
-                query = """
-                    INSERT INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora, CodClasse, JaClassificado)
-                    VALUES (:id_base, :id_similar, :similaridade, NOW(), NULL, false)
-                """
-                for i in range(0, len(batch_params), BATCH_SIZE):
-                    batch = batch_params[i:i + BATCH_SIZE]
-                    self.session.execute(text(query), batch)
-                    self.session.commit()
-                    self.logger.info(f"Inseridas {len(batch)} sugestões em batch")
-        except Exception as e:
-            self.logger.error(f"Erro ao inserir clusters na tabela: {e}")
-            self.session.rollback()
 
     def indexa_e_classifica_textos_pendentes(self) -> dict:
-        """
-        Processa textos pendentes: indexa no Qdrant, busca similares e forma clusters.
-        """
         print_with_time(f"Iniciando indexação e detecção de textos similares...")
-        self.clusters = {}  # Reseta cache
+        self.clusters = {} # Reseta cache
         data = self._fetch_data()
-        processados = []
+        if not data:
+            sucessMessage = "Nenhum texto pendente para processar."
+            print_with_time(sucessMessage)
+            return {
+                "status": "OK",
+                "processados": sucessMessage,
+                "restante": f"Restam 0 textos pendentes."
+            }
 
-        for row in tqdm(data, desc="Processando textos pendentes"):
-            id_texto = row['id']
-            texto = row['Text']
+        # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
+        processed_data = []
+        for i, row in enumerate(tqdm(data, desc="Gerando embeddings")):
+            try:
+                embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'])
+                # Clear cache every 20 batches
+                if i % 20 == 0:
+                    torch.cuda.empty_cache()
 
-            # Gera embedding
-            embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(texto)
+                processed_data.append({
+                    'Id': row['id'],
+                    'Embedding': embedding,
+                    'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
+                })
+            except Exception as e:
+                self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
+                               
+        torch.cuda.empty_cache()
 
-            # Insere no Qdrant
-            self._insert_qdrant(id_texto, embedding)
+        # Insere no Qdrant em lotes menores e atualiza UpInsertOk
+        insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
+        for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
+            batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
+            batch_data = self._insert_lista_texto_qdrant(batch_data)
+            # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
+            self._mark_lista_as_indexado(batch_data)
 
-            # Marca como indexado
-            self._mark_as_indexado(id_texto)
-
-            # Busca similares
-            high_similars = self._search_qdrant(embedding, id_texto)
-
-            # Atualiza clusters se >= 3 similares
-            if len(high_similars) >= self.min_similars:
-                self._update_clusters(id_texto, high_similars)
-
-            processados.append(id_texto)
-
-        # Insere clusters na tabela
-        self._insert_clusters_to_db()
-
-        sucessMessage = f"Processados {len(processados)} textos pendentes com Qdrant."
+        sucessMessage = f"Processados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes com Qdrant."
         print_with_time(sucessMessage)
-
         return {
             "status": "OK",
             "processados": sucessMessage,
-            "restate": f"Restam {self._get_Textos_Pendentes()[0]['TotalTextosPendentes']} textos pendentes."
+            "restante": f"Restam {self._get_Textos_Pendentes()[0]['TotalTextosPendentes']} textos pendentes."
         }
+    

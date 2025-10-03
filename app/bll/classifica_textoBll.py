@@ -75,7 +75,7 @@ class classifica_textoBll:
         min_similarity = 0.8
         try:
             faiss.normalize_L2(query_embedding)
-            distances, indices = self.embeddingsModule.index.search(query_embedding, top_k)
+            distances, indices = self.embeddingsModule.index.search(query_embedding, top_k) # pyright: ignore[reportCallIssue]
             results = [
                 {
                     "IdEncontrado": self.embeddingsModule.metadata["Id"][idx],
@@ -118,7 +118,7 @@ class classifica_textoBll:
                 medias_por_classe[cod_classe].append(result["Similaridade"])
                 contagem_por_classe[cod_classe] += 1
 
-                if max_sim_por_classe[cod_classe] is None or result["Similaridade"] > max_sim_por_classe[cod_classe]["Similaridade"]:
+                if max_sim_por_classe[cod_classe] is None or result["Similaridade"] > max_sim_por_classe[cod_classe]["Similaridade"]: # pyright: ignore[reportOptionalSubscript]
                     max_sim_por_classe[cod_classe] = result
 
             # Calculate averages
@@ -144,7 +144,7 @@ class classifica_textoBll:
             maior_item_qtd      = max(lista_classes_info,key=lambda x: x.Quantidade or 0)
             # Determine method and parent item if not "E"
             if metodo != "E":
-                if (maior_item_media.Media >= 0.91) and (maior_item_media.Quantidade >= 3):
+                if  (maior_item_media.Media >= 0.91) and (maior_item_media.Quantidade >= 3):  # pyright: ignore[reportOptionalOperand]
                     # Find the item in results with the highest Similaridade for the CodClasse with the highest Media                                     
                     metodo = "M"
                     item_pai = {
@@ -153,7 +153,7 @@ class classifica_textoBll:
                         "Classe" : maior_item_media.Classe,
                         "Similaridade": maior_item_media.Media
                     }
-                elif (maior_item_qtd.Quantidade >= 4) and (maior_item_qtd.Media >= 0.87):
+                elif (maior_item_qtd.Quantidade >= 4) and (maior_item_qtd.Media >= 0.87): # pyright: ignore[reportOptionalOperand]
                     # Find the item in results with the highest Qtd for the CodClasse with the highest Qtd                
                     metodo = "Q"
                     item_pai = {
@@ -171,17 +171,17 @@ class classifica_textoBll:
                         "Similaridade": None
                     }
             if gravar_log:
-                self.log_ClassificacaoBll.gravaLogClassificacao(item_pai["IdEncontrado"], 
+                self.log_ClassificacaoBll.gravaLogClassificacao(item_pai["IdEncontrado"],  # pyright: ignore[reportOptionalSubscript]
                                                                 id_a_classificar, 
                                                                 metodo, 
                                                                 TabelaOrigem,
-                                                                item_pai["CodClasse"])
+                                                                item_pai["CodClasse"]) # pyright: ignore[reportOptionalSubscript]
 
             return self.ResultadoSimilaridade(
-                IdEncontrado=item_pai["IdEncontrado"],
-                CodClasse=item_pai["CodClasse"],
-                Classe=item_pai["Classe"],
-                Similaridade=item_pai["Similaridade"],
+                IdEncontrado=item_pai["IdEncontrado"], # pyright: ignore[reportOptionalSubscript]
+                CodClasse=item_pai["CodClasse"], # pyright: ignore[reportOptionalSubscript]
+                Classe=item_pai["Classe"], # pyright: ignore[reportOptionalSubscript]
+                Similaridade=item_pai["Similaridade"], # pyright: ignore[reportOptionalSubscript]
                 Metodo=metodo,
                 CodClasseMedia=classe_maior_media,
                 CodClasseQtd=classe_maior_qtd,
@@ -191,24 +191,12 @@ class classifica_textoBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
 
+    ###   Classifica um texto com base na similaridade com embeddings de referência.        
     def classifica_texto(self, texto: str, id_a_classificar: Optional[int] = None,
                         TabelaOrigem:Optional[str] = "",
                         top_k: int = 20,
                         gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
-        """
-        Classifica um texto com base na similaridade com embeddings de referência.
-
-        Args:
-            texto (str): Texto a ser classificado.
-            top_k (int): Número de resultados mais similares a retornar (padrão: 20).
-
-        Returns:
-            ResultadoSimilaridade: Object containing similarity results, including lists of similar items
-                                  and class information (average and count).
-
-        Raises:
-            RuntimeError: If embedding generation or similarity search fails.
-        """
+        
         try:
             # Generate embedding for the input text to compare in future
             query_embedding = self.embeddingsModule.generate_embedding(texto)
