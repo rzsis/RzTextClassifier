@@ -47,6 +47,125 @@ class sugestao_textos_classificarBll:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
 
     #obtem a quantidade de textos pendentes
+    def _get_Textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
+        try:
+            query = """
+                SELECT t.id, t.TxtTreinamento AS Text
+                FROM textos_classificar t
+                WHERE Indexado = true
+                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
+                and t.BuscouSimilar = false                
+                ORDER BY t.id                
+                LIMIT 2000                
+            """
+            return self.session.execute(text(query)).mappings().all()
+        except Exception as e:
+            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+        
+
+    def processa_textos_falta_buscar_similar(self):
+        try:
+            print_with_time(f"Iniciando busca de textos similares...")
+            data = self._get_Textos_falta_buscar_similar()
+            if not data:
+                sucessMessage = "Nenhum texto textos similar restante para classifica."
+                print_with_time(sucessMessage)
+                return {
+                    "status": "OK",
+                    "processados": sucessMessage,
+                    "restante": f"Restam 0 textos pendentes."
+                }
+            
+            similares_inseridos = 0
+            for row in tqdm(data, desc="Processando textos para busca de similares"):
+                try:
+                    embedding   = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'])
+                    similars    = self._search_qdrant(embedding, row['id'])
+                    if len(similars) >= self.min_similars:
+                        self._insere_sugestao_textos_classificar(row['id'], similars)                        
+                        similares_inseridos += 1
+                
+                except Exception as e:
+                    self.logger.error(f"Erro ao processar texto id {row['id']}: {e}")
+
+            self._mark_as_buscou_similar(data)                    
+            
+            sucessMessage = f"Inseridos {similares_inseridos} sugestões de textos similares."
+            print_with_time(sucessMessage)
+            return {
+                "status": "OK",
+                "processados": sucessMessage,
+                "restante": f"Restam {self._get_Textos_falta_buscar_similar()[0]['TotalTextosPendentes']} textos pendentes."
+            }
+        except Exception as e:
+            errorMessage = f"Erro ao processar textos para busca de similares: {e}"
+            print_error(errorMessage)
+            return {
+                "status": "ERROR",
+                "processados": errorMessage,
+                "restante": ""
+            }
+        
+    #insere as sugestões de textos similares na tabela sugestao_textos_classificar
+    def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):
+        try:
+            query = f"""
+                select * from sugestao_textos_classificar 
+                where IdBase = :id_texto or IdSimilar = :id_textoSimilar
+            """
+            sugestos_existentes = self.session.execute(
+                    text(query),
+                    {
+                        "id_texto": id_texto,
+                        "id_textoSimilar": id_texto,                        
+                    }
+            ).mappings().all()
+
+             
+            if len(sugestos_existentes) > 0:                
+                return
+            
+            for similar in similars:
+                try:
+                    query = """
+                        INSERT INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
+                        VALUES (:id_base, :id_similar, :similaridade, NOW())
+                    """
+                    self.session.execute(
+                        text(query),
+                        {
+                            "id_base": id_texto,
+                            "id_similar": similar['id'],
+                            "similaridade": similar['score']
+                        }
+                    )
+                    self.session.commit()
+                except Exception as e:
+                    self.logger.error(f"Erro ao inserir sugestao_textos_classificar para id {id_texto}: {e}")
+                    self.session.rollback()
+
+        except Exception as e:
+                self.logger.error(f"Erro ao inserir sugestões de textos similares para id {id_texto}: {e}")
+                self.session.rollback()
+
+    #depois de processado marca como BuscouSimilar a lista que foi processada
+    def _mark_as_buscou_similar(self, data: Sequence[RowMapping]):
+        try:
+            ids_to_update = [row['id'] for row in data]
+            query = """
+                UPDATE textos_classificar
+                SET BuscouSimilar = true
+                WHERE id IN :ids
+            """
+            self.session.execute(text(query), {"ids": tuple(ids_to_update)})
+            self.session.commit()
+            self.logger.info(f"Marcados {len(ids_to_update)} textos como buscou similar em lote.")
+        except Exception as e:
+            self.logger.error(f"Erro ao marcar textos como buscou similar em lote: {e}")
+            self.session.rollback()
+
+
+    #obtem a quantidade de textos pendentes
     def _get_Textos_Pendentes(self) -> Sequence[RowMapping]:
         try:
             query = """
@@ -219,6 +338,9 @@ class sugestao_textos_classificarBll:
             batch_data = self._insert_lista_texto_qdrant(batch_data)
             # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
             self._mark_lista_as_indexado(batch_data)
+
+        self.processa_textos_falta_buscar_similar()
+
 
         sucessMessage = f"Processados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes com Qdrant."
         print_with_time(sucessMessage)

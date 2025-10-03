@@ -21,8 +21,8 @@ class LogClassificacaoBll:
             metodo (str): The classification method used.
             tabela_origem (str): The origin of the text ('C', 'T', or 'A').
         """
+        session = self.session        
         try:
-            session = self.session
             query = """
                 INSERT INTO log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo, CodClasseInferido )
                 VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo, :cod_classe_inferido)
@@ -44,21 +44,12 @@ class LogClassificacaoBll:
             print_error(f"Error inserting classification log (IdReferencia: {id_referencia}): {e}")
             session.rollback()
 
-    def gravaLogClassificacaoBatch(self, logs: list[dict]):
-        """
-        Inserts multiple classification log entries into the log_classificacao table in batches of 100,
-        committing each batch and any remaining records.
-
-        Args:
-            logs (list[dict]): List of dictionaries containing log data with keys:
-                IdEncontrado (int): The reference ID
-                IdAClassificar (int): The classified ID
-                Metodo (str): The classification method used
-                TabelaOrigem (str): The origin of the text ('C', 'T', or 'A')
-        """
+    #   Inserts multiple classification log entries into the log_classificacao table in batches of 100,
+    #    committing each batch and any remaining records.
+    def gravaLogClassificacaoBatch(self, logs: list[dict]):        
+        session = self.session            
         BATCH_SIZE = 100
-        try:
-            session = self.session            
+        try:        
             query = """
                 INSERT ignore INTO  log_classificacao (IdReferencia, IdClassificado, DataHora, TabelaOrigem, Metodo,CodClasseInferido)
                 VALUES (:id_referencia, :id_classificado, :data_hora, :tabela_origem, :metodo, :cod_classe_inferido)
