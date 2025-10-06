@@ -7,12 +7,14 @@ import numpy as np
 import faiss
 from sqlalchemy import RowMapping, Sequence, text
 from sympy import Id
+import torch
 from tqdm import tqdm
 from sqlalchemy.orm import Session
 from common import print_with_time, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
+import gpu_utils
 import logger
 
 class ClassificaTextosPendentesBll:
@@ -38,12 +40,10 @@ class ClassificaTextosPendentesBll:
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log            
 
-
-
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
         
-    def _get_Textos_Pendentes(self) -> int:        
+    def _get_qtd_textos_pendentes(self) -> int:        
         try:
             query = """
                 SELECT Count(t.id) AS TotalTextosPendentes
@@ -133,10 +133,10 @@ class ClassificaTextosPendentesBll:
             session.rollback()            
 
 
+    #classifica os contido em textos_classificar que ainda não foram classificados
     def classifica_textos_pendentes(self) -> dict[str, Any]:
-        """
-        Start processing the dataset.
-        """
+        from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBLLModule
+
         print_with_time(f"Iniciando processamento para classificação de textos a classificar pendentes...")
 
         embeddingsBllModule.initBllEmbeddings(self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
@@ -146,7 +146,7 @@ class ClassificaTextosPendentesBll:
         
         lista_log_classificacao = []
 
-        for row in tqdm(data, desc="Processando textos a classificar pendentes"):
+        for i,row in enumerate(tqdm(data, desc="Processando textos a classificar pendentes")):
             id_texto = row['id']
             texto = row['Text']            
             result = self.classifica_textoBll.classifica_texto( texto,
@@ -161,17 +161,24 @@ class ClassificaTextosPendentesBll:
                 "CodClasseInferido": result.CodClasse,
                 "Similaridade": result.Similaridade
             })
+
+                # Clear cache every 20 batches
+            if i % 20 == 0:
+                gpu_utils.GpuUtils().clear_gpu_cache()          
             
         
         self._grava_classificacao_textos_pendentes(lista_log_classificacao)
-
         self.log_ClassificacaoBll.gravaLogClassificacaoBatch(lista_log_classificacao)
+    
 
         sucessMessage = f"Processados {len(lista_log_classificacao)} textos a classificar pendentes."
         print_with_time(sucessMessage)
+        
+        sugere_textos_classificarBll = sugere_textos_classificarBLLModule(self.session)                
+        sugere_textos_classificarBll.indexa_e_classifica_textos_classificar()        
     
         return {
             "status": "OK",
             "processados": sucessMessage,
-            "restate": f"Restam {self._get_Textos_Pendentes()} textos a classificar pendentes."
+            "restate": f"Restam {self._get_qtd_textos_pendentes()} textos a classificar pendentes."
         }

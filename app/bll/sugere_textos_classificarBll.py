@@ -11,13 +11,14 @@ from common import print_with_time, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
+import gpu_utils
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
 import faiss
 from collections.abc import Sequence
 import torch
 
-class sugestao_textos_classificarBll:
+class sugere_textos_classificarBll:
     def __init__(self, session: Session):
         """
         Inicializa a classe para indexação e detecção de textos similares usando Qdrant.
@@ -43,18 +44,42 @@ class sugestao_textos_classificarBll:
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
+            self.baseWhereSQLClassificar = """
+                                    WHERE Indexado = false
+                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
+                                    and t.Metodo in ('N','Q','M')
+                                """
+            
+            self.baseWhereSQLBuscarSimilar = """
+                                    WHERE Indexado = true
+                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
+                                    and t.BuscouSimilar = false                
+                                    and t.Metodo in ('N','Q','M')
+                  """            
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
+
+    #obtem a quantidade de textos pendentes falta buscar similar
+    def _get_qtd_textos_falta_buscar_similar(self) -> int:
+        try:
+            query = f"""
+                SELECT Count(t.id) AS TotalTextosPendentes
+                FROM textos_classificar t
+                {self.baseWhereSQLBuscarSimilar}
+                ORDER BY t.id
+            """
+            return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
+        except Exception as e:
+            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+        
 
     #obtem a quantidade de textos pendentes
     def _get_Textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
         try:
-            query = """
+            query = f"""
                 SELECT t.id, t.TxtTreinamento AS Text
                 FROM textos_classificar t
-                WHERE Indexado = true
-                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
-                and t.BuscouSimilar = false                
+                {self.baseWhereSQLBuscarSimilar}
                 ORDER BY t.id                
                 LIMIT 2000                
             """
@@ -95,7 +120,7 @@ class sugestao_textos_classificarBll:
             return {
                 "status": "OK",
                 "processados": sucessMessage,
-                "restante": f"Restam {self._get_Textos_falta_buscar_similar()[0]['TotalTextosPendentes']} textos pendentes."
+                "restante": f"Restam {self._get_qtd_textos_falta_buscar_similar()} textos pendentes."
             }
         except Exception as e:
             errorMessage = f"Erro ao processar textos para busca de similares: {e}"
@@ -166,27 +191,25 @@ class sugestao_textos_classificarBll:
 
 
     #obtem a quantidade de textos pendentes
-    def _get_Textos_Pendentes(self) -> Sequence[RowMapping]:
+    def _get_qtd_textos_pendentes_classificar(self) -> int:
         try:
-            query = """
+            query = f"""
                 SELECT Count(t.id) AS TotalTextosPendentes
                 FROM textos_classificar t
-                WHERE Indexado = false
-                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                
+                {self.baseWhereSQLClassificar}
                 ORDER BY t.id
             """
-            return self.session.execute(text(query)).mappings().all()
+            return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
 
     #obtem os dados a serem indexados
-    def _fetch_data(self) -> Sequence[RowMapping]:
+    def _fetch_data_to_classify(self) -> Sequence[RowMapping]:
         try:
-            query = """
+            query = f"""
                 SELECT t.id, t.TxtTreinamento AS Text
                 FROM textos_classificar t
-                WHERE Indexado = false
-                and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
+                {self.baseWhereSQLClassificar}
                 ORDER BY t.id
                 LIMIT 2000
             """
@@ -299,10 +322,10 @@ class sugestao_textos_classificarBll:
             return []
 
 
-    def indexa_e_classifica_textos_pendentes(self) -> dict:
+    def indexa_e_classifica_textos_classificar(self) -> dict:
         print_with_time(f"Iniciando indexação e detecção de textos similares...")
         self.clusters = {} # Reseta cache
-        data = self._fetch_data()
+        data = self._fetch_data_to_classify()
         if not data:
             sucessMessage = "Nenhum texto pendente para processar."
             print_with_time(sucessMessage)
@@ -319,7 +342,7 @@ class sugestao_textos_classificarBll:
                 embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'])
                 # Clear cache every 20 batches
                 if i % 20 == 0:
-                    torch.cuda.empty_cache()
+                     gpu_utils.GpuUtils().clear_gpu_cache()
 
                 processed_data.append({
                     'Id': row['id'],
@@ -329,7 +352,7 @@ class sugestao_textos_classificarBll:
             except Exception as e:
                 self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
                                
-        torch.cuda.empty_cache()
+        gpu_utils.GpuUtils().clear_gpu_cache()
 
         # Insere no Qdrant em lotes menores e atualiza UpInsertOk
         insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
@@ -347,6 +370,6 @@ class sugestao_textos_classificarBll:
         return {
             "status": "OK",
             "processados": sucessMessage,
-            "restante": f"Restam {self._get_Textos_Pendentes()[0]['TotalTextosPendentes']} textos pendentes."
+            "restante": f"Restam {self._get_qtd_textos_pendentes_classificar()} textos pendentes."
         }
     

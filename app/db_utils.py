@@ -5,11 +5,11 @@ import localconfig
 
 class Session:
     def __init__(self,localcfg:localconfig):
-        usuario: str = localcfg.get_db_user()
-        senha: str = localcfg.get_db_password()
-        host: str = localcfg.get_db_server()
-        porta: int = localcfg.get_db_port()
-        banco: str = localcfg.get_db_name()        
+        usuario: str = localcfg.get_db_user() # pyright: ignore[reportAssignmentType]
+        senha: str = localcfg.get_db_password() # type: ignore
+        host: str = localcfg.get_db_server() # type: ignore
+        porta: int = localcfg.get_db_port() # type: ignore
+        banco: str = localcfg.get_db_name()         # type: ignore
         
 
         self.engine = None

@@ -16,10 +16,12 @@ from common import print_with_time
 from collections import defaultdict
 import csv
 from db_utils import Session
+import gpu_utils
 import localconfig
 from pydantic import BaseModel
 from typing import List, Optional
 import bll.ids_e_classes_corretasBll  as IdsEClassesCorretasBllModule
+import logger
 
 bllEmbeddings = None
 
@@ -39,14 +41,29 @@ class EmbeddingsBll:
     def __init__(self):
         from main import localconfig as localcfg  # importa localconfig do main.py            
         self.localconfig = localcfg
+        self.max_length = self.localconfig.get("max_length")                       
+        self.max_txt_lenght = self.max_length*8  # Limite máximo de caracteres para o texto de entrada
         os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
-        os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions        
+        os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions 
+        self.logger = logger.log        
 
     # Função para gerar embedding para comparação do texto, transformando o texto em um vetor numérico
     def generate_embedding(self, text: str) -> np.ndarray:
         try:
+            # Preprocess text to remove invalid characters and handle edge cases
+            if not text or not isinstance(text, str):
+                return None # pyright: ignore[reportReturnType]
+             
+            # Remove non-printable characters (ASCII < 32 or 127)
+            clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127)
+            # Limit text length to avoid excessive tokenization
+            clean_text = clean_text[:self.max_txt_lenght].strip()  # Adjust max length as needed
+            
+            if not clean_text:
+                return None  # pyright: ignore[reportReturnType] # Return None for empty text after preprocessing
+            
             inputs = self.tokenizer(
-                text,
+                clean_text,
                 return_tensors="pt",
                 truncation=True,
                 max_length=self.max_length,
@@ -59,9 +76,11 @@ class EmbeddingsBll:
             
             # Liberar tensores intermediários
             del inputs, outputs
+            gpu_utils.GpuUtils().clear_gpu_cache()
+
             return embedding
         except Exception as e:
-            raise RuntimeError(f"Erro ao gerar embedding: {e}")            
+            raise RuntimeError(f"Erro ao gerar embedding: {e}")  # Log error for debugging            
 
     #Inicializa os modelos e carrega os embeddings
     #embedding_type pode ser train ou final
@@ -87,13 +106,12 @@ class EmbeddingsBll:
             if (os.path.exists(model_path) == False):
                 raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")                                 
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            gpu_utils.GpuUtils().clear_gpu_cache()
                 
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.model = AutoModel.from_pretrained(model_path).to("cuda" if torch.cuda.is_available() else "cpu")
             self.model.eval()
-            self.max_length = self.localconfig.read_config().get("max_length")
+
             print_with_time(f"Modelo e tokenizer carregados de {model_path}")
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")            
@@ -144,8 +162,7 @@ class EmbeddingsBll:
             faiss.normalize_L2(embeddings)
             
             # Limpar cache da GPU, se disponível e necessário
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            gpu_utils.GpuUtils().clear_gpu_cache()
             
             # Criar índice FAISS (mantido na CPU)
             self.dim = embeddings.shape[1]

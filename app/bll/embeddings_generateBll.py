@@ -10,6 +10,7 @@ from common import  print_with_time, print_error
 from collections import Counter
 from bll.idsDuplicadosBll import IdsDuplicados
 from sqlalchemy import text
+import gpu_utils
 import localconfig
 
 class Embeddings_GenerateBll:
@@ -214,11 +215,11 @@ class Embeddings_GenerateBll:
 
                 # Clear cache every 20 batches
                 if i % 2 == 0:
-                    torch.cuda.empty_cache()
+                    gpu_utils.GpuUtils().clear_gpu_cache()
 
             except torch.cuda.CudaError as e:
                 print_error(f"CUDA error in batch {i//self.batch_size}: {e}")
-                torch.cuda.empty_cache()
+                gpu_utils.GpuUtils().clear_gpu_cache()
                 skipped += len(batch_valid)
                 continue
             except Exception as e:

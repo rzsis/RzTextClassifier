@@ -12,7 +12,7 @@ from common import get_session_db
 from sqlalchemy.orm import Session
 import bll.embeddingsBll as embeddingsBllModule
 from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as classifica_textos_pendentesBllModule
-from bll.sugestao_textos_classificarBLL import sugestao_textos_classificarBll as sugestao_textos_classificarBllModule
+from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBllModule
 
 router = APIRouter()
    
@@ -40,10 +40,9 @@ async def ClassificaTexto(texto: str,
 
     
 
-#endpoint para classificação de texto
+#classifica os textos pendentes em textos_classificar
 @router.post("/classifica_textos_pendentes")
 async def classifica_textos_pendentes(session: Session = Depends(get_session_db)  ):        
-
     try:     
         embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         classifica_textos_pendentesBll = classifica_textos_pendentesBllModule(session)
@@ -58,8 +57,8 @@ async def sugere_textos_classificar(session: Session = Depends(get_session_db)  
 
     try:     
         embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
-        sugestao_textos_classificarBll = sugestao_textos_classificarBllModule(session)
-        return sugestao_textos_classificarBll.indexa_e_classifica_textos_pendentes()
+        sugere_textos_classificarBll = sugere_textos_classificarBllModule(session)
+        return sugere_textos_classificarBll.indexa_e_classifica_textos_classificar()
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    

@@ -18,6 +18,7 @@ class classifica_textoBll:
         self.embeddingsModule = embeddingsModule          
         self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)
         self.session = session  
+        
 
     # Pydantic model classes
     class ItemSimilar(BaseModel):

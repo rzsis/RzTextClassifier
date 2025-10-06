@@ -3,6 +3,7 @@ Para se gerar o dataset necessário é necessario seguir os passos a seguir
 
 Objetivo macro do algoritimo
 
+1º Caso para tr
 1º Gerar embbedings através do endereço http://10.1.1.95:5020/generateembeddings?split=train
     Como dica de otimização a primeira que é gerado se o banco tiver muitos idsiguais pode se chamar api para ela e começar denovo pois o sistema só ira processar textos unicos
 
