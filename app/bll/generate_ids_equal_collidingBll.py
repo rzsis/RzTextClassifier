@@ -149,7 +149,7 @@ class GenerateIdsIguaisCollindgs:
                         items_to_remove.add(neighbor_orig_idx)
                         lista_ids_collidentes.append(idCollidingModule.IdsColidentes(Id=id_tram, 
                                                                         IdColidente=neighbor_id,
-                                                                        semelhanca=float(sim*100),
+                                                                        semelhanca=float((sim or 0)*100),
                                                                         ))
 
                     # Log collisions with similarity > similarity_threshold_colliding and classe different

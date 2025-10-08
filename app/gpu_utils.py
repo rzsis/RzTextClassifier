@@ -6,8 +6,9 @@ from common import print_with_time
 class GpuUtils:
     def __init__(self) -> None:
         self.qtd_clear = 0
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
+
+        torch.backends.cuda.matmul.allow_tf32 = False #evita usar Tensor Cores que podem introduzir imprecisões e evitar erros
+        torch.backends.cudnn.allow_tf32 = False #evita usar Tensor Cores que podem introduzir imprecisões e evitar erros
         try:
             torch.set_float32_matmul_precision("medium")  # "high" pode ativar TF32 em Ampere
         except Exception:
@@ -19,8 +20,8 @@ class GpuUtils:
             torch.cuda.synchronize()  # Sincroniza para garantir que todas as operações na GPU terminaram            
             self.qtd_clear += 1
 
-            if self.qtd_clear % 10 == 0:
-                time.sleep(0.5)  # 0.5 segundo a cada 10 limpezas para evitar sobrecarga
+            if self.qtd_clear % 15 == 0:
+                time.sleep(0.1)  # 0.1 segundo a cada 10 limpezas para evitar sobrecarga
 
     def print_gpu_info(self):
         print_with_time(f"PyTorch: {torch.__version__}")

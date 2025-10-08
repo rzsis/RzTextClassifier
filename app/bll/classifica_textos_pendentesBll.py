@@ -2,7 +2,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 import numpy as np
 import faiss
 from sqlalchemy import RowMapping, Sequence, text
@@ -52,7 +52,6 @@ class ClassificaTextosPendentesBll:
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
                 AND t.TxtTreinamento <> ''
-                and Classificado = false
                 ORDER BY t.id                
             """            
             return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
@@ -100,7 +99,7 @@ class ClassificaTextosPendentesBll:
         try:           
             query = """
                 Update textos_classificar set CodClasseInferido = :cod_classe_inferido , Similaridade = :similaridade, Metodo = :metodo,IdReferencia = :id_referencia,
-                Classificado = true
+                Classificado = 1
                 where id = :id_classificado
             """         
                            
@@ -110,10 +109,10 @@ class ClassificaTextosPendentesBll:
                 batch_params = [
                     {
                         "cod_classe_inferido": classificado["CodClasseInferido"],
-                        "similaridade": classificado["Similaridade"],
+                        "similaridade": (classificado["Similaridade"] or 0)*100,
                         "metodo": classificado["Metodo"],
                         "id_classificado": classificado["IdAClassificar"],                        
-                        "id_referencia": classificado["IdEncontrado"]                            
+                        "id_referencia": classificado["IdEncontrado"] if classificado.get("IdEncontrado") is not None else None
                     }
                     for classificado in batch
                 ]
@@ -123,14 +122,12 @@ class ClassificaTextosPendentesBll:
                     session.execute(text(query), batch_params)
                     session.commit()
                     self.logger.info(f"Successfully committed batch of {len(batch)} classification logs")
-                except Exception as e:
-                    self.logger.error(f"Error inserting batch of {len(batch)} classification logs: {e}")
-                    print_error(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                except Exception as e:                    
+                    print_with_time(f"Error inserting batch of {len(batch)} classification logs: {e}")
                     session.rollback()
                     continue
-        except Exception as e:
-            self.logger.error(f"Error processing batch classification logs: {e}")
-            print_error(f"Error processing batch classification logs: {e}")
+        except Exception as e:            
+            print_with_time(f"Error processing batch classification logs: {e}")
             session.rollback()            
 
 
@@ -164,7 +161,7 @@ class ClassificaTextosPendentesBll:
             })
 
                 # Clear cache every X batches
-            if i % 10 == 0:
+            if i % 20 == 0:
                 self.gpu_utils.clear_gpu_cache()          
             
         

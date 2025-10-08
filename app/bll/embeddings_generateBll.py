@@ -207,7 +207,7 @@ class Embeddings_GenerateBll:
                         )
 
                 # Clear cache every X batches
-                if i % 10 == 0:
+                if i % 20 == 0:
                    self.gpu_utils.clear_gpu_cache()
 
             except torch.cuda.CudaError as e:

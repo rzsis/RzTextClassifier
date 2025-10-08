@@ -76,7 +76,7 @@ class classifica_textoBll:
                 return self.ResultadoSimilaridade(
                     IdEncontrado=None,
                     CodClasse=None,
-                    Classe=f"Não encontrada similaridade superior {min_similarity*100}%",
+                    Classe=f"Não encontrada similaridade superior {(min_similarity or 0 )*100}%",
                     Similaridade=None,
                     Metodo="N",
                     CodClasseMedia=None,

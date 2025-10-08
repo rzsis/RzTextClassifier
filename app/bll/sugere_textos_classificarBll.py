@@ -46,12 +46,14 @@ class sugere_textos_classificarBll:
             self.logger = logger.log
             self.baseWhereSQLClassificar = """
                                     WHERE Indexado = false
+                                    and Classificado = true
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
                                     and t.Metodo in ('N','Q','M')                                    
                                 """
             
             self.baseWhereSQLBuscarSimilar = """
                                     WHERE Indexado = true
+                                    and Classificado = true
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
                                     and t.BuscouSimilar = false                
                                     and t.Metodo in ('N','Q','M')                                    
@@ -118,6 +120,7 @@ class sugere_textos_classificarBll:
             
             sucessMessage = f"Inseridos {similares_inseridos} sugestões de textos similares."
             print_with_time(sucessMessage)
+            self.gpu_utils.clear_gpu_cache()
             return {
                 "status": "OK",
                 "processados": sucessMessage,
@@ -162,7 +165,7 @@ class sugere_textos_classificarBll:
                         {
                             "id_base": id_texto,
                             "id_similar": similar['id'],
-                            "similaridade": similar['score']
+                            "similaridade": (similar['score'] or 0)*100
                         }
                     )
                     self.session.commit()
@@ -342,7 +345,7 @@ class sugere_textos_classificarBll:
             try:
                 embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
                 # Clear cache every X batches
-                if i % 10 == 0:
+                if i % 20 == 0:
                      self.gpu_utils.clear_gpu_cache()
 
                 processed_data.append({
@@ -364,7 +367,7 @@ class sugere_textos_classificarBll:
             self._mark_lista_as_indexado(batch_data)
 
         self.processa_textos_falta_buscar_similar()
-
+        self.gpu_utils.clear_gpu_cache()
 
         sucessMessage = f"Processados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes com Qdrant."
         print_with_time(sucessMessage)
