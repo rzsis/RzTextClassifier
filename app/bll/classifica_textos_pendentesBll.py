@@ -14,7 +14,7 @@ from common import print_with_time, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
-import gpu_utils
+import gpu_utils as gpu_utilsModule
 import logger
 
 class ClassificaTextosPendentesBll:
@@ -38,7 +38,8 @@ class ClassificaTextosPendentesBll:
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings,
                             session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
-            self.logger = logger.log            
+            self.logger = logger.log
+            self.gpu_utils = gpu_utilsModule.GpuUtils()         
 
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
@@ -162,9 +163,9 @@ class ClassificaTextosPendentesBll:
                 "Similaridade": result.Similaridade
             })
 
-                # Clear cache every 20 batches
-            if i % 20 == 0:
-                gpu_utils.GpuUtils().clear_gpu_cache()          
+                # Clear cache every X batches
+            if i % 10 == 0:
+                self.gpu_utils.clear_gpu_cache()          
             
         
         self._grava_classificacao_textos_pendentes(lista_log_classificacao)

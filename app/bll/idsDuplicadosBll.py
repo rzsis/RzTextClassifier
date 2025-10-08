@@ -17,9 +17,10 @@ class IdsDuplicados:
             id (int): The reference ID to exclude from duplicates.
             texto (str): The text to check for duplicates (TxtTreinamento).
             cod_classe (int): The CodClasse associated with the text.
-        """
+        """ 
+        session = self.db
         try:
-            session = self.db
+            
             query = """
                 INSERT ignore INTO  idsduplicados (Id, CodClasse)
                 SELECT t.Id, :cod_classe

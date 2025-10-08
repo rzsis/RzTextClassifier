@@ -49,7 +49,7 @@ async def classifica_textos_pendentes(session: Session = Depends(get_session_db)
         return classifica_textos_pendentesBll.classifica_textos_pendentes()
         
     except Exception as e:
-        return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
+        return HTTPException(status_code=500, detail=f"Erro em classifica_textos_pendentes : {str(e)}")
     
 #endpoint para sugere textos a classificar
 @router.post("/sugere_textos_classificar")

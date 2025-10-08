@@ -1,6 +1,7 @@
 #embeddings_generate.py
 import os
 from pathlib import Path
+from typing_extensions import runtime
 import numpy as np
 from requests import Session
 from transformers import AutoTokenizer, AutoModel
@@ -10,18 +11,11 @@ from common import  print_with_time, print_error
 from collections import Counter
 from bll.idsDuplicadosBll import IdsDuplicados
 from sqlalchemy import text
-import gpu_utils
+import gpu_utils as gpu_utilsModule
 import localconfig
 
 class Embeddings_GenerateBll:
     def __init__(self, split:str, session: Session, localcfg:localconfig):
-        """
-        Initialize the GenerateEmbeddings class.
-
-        Args:
-            db (Db): Database connection instance.
-            localconfig: The localconfig module to read configuration.
-        """
         self.session        = session
         self.localconfig    = localcfg
         self.config         = localcfg.read_config()  # Read config from the provided localconfig module
@@ -35,6 +29,7 @@ class Embeddings_GenerateBll:
         self.model          = None  
         self.split          = split  # 'train' or 'final'      
         self.ids_duplicados = IdsDuplicados(session)
+        self.gpu_utils      = gpu_utilsModule.GpuUtils()
 
         # Validate model directory
         if not os.path.isdir(self.model_path):
@@ -47,6 +42,8 @@ class Embeddings_GenerateBll:
     def _load_model(self):
         """Load the tokenizer and model."""
         try:
+            raise RuntimeError("verificar pois isso deveria de carregar o modelo e tokenizer")
+        
             self.tokenizer = AutoTokenizer.from_pretrained(str(self.model_path), use_fast=True)
             self.model = AutoModel.from_pretrained(str(self.model_path)).to("cuda" if torch.cuda.is_available() else "cpu")
             self.model.eval()
@@ -150,10 +147,6 @@ class Embeddings_GenerateBll:
         
     #Transforma os dados em embeddings
     def _process_embeddings(self, dados, split) -> tuple:
-
-        os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
-        os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
-
         print_with_time(f"Initial GPU memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")        
         # Prepare structures
         field_embeddings = {field: [] for field in self.textual_fields}
@@ -213,13 +206,13 @@ class Embeddings_GenerateBll:
                             cod_classe=exemplo['CodClasse']
                         )
 
-                # Clear cache every 20 batches
-                if i % 2 == 0:
-                    gpu_utils.GpuUtils().clear_gpu_cache()
+                # Clear cache every X batches
+                if i % 10 == 0:
+                   self.gpu_utils.clear_gpu_cache()
 
             except torch.cuda.CudaError as e:
                 print_error(f"CUDA error in batch {i//self.batch_size}: {e}")
-                gpu_utils.GpuUtils().clear_gpu_cache()
+                self.gpu_utils.clear_gpu_cache()
                 skipped += len(batch_valid)
                 continue
             except Exception as e:

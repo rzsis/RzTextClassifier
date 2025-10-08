@@ -59,20 +59,6 @@ class classifica_textoBll:
                                 TabelaOrigem:Optional[str] = "", 
                                 top_k: int = 20,
                                 gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
-        """
-        Searches for similar embeddings in the reference set.
-
-        Args:
-            query_embedding (np.ndarray): The query embedding to search with.
-            top_k (int): Number of top similar results to return (default: 20).
-
-        Returns:
-            ResultadoSimilaridade: Object containing similarity results, including lists of similar items
-                                  and class information (average and count).
-
-        Raises:
-            RuntimeError: If the search process fails.
-        """
         min_similarity = 0.8
         try:
             faiss.normalize_L2(query_embedding)
@@ -200,11 +186,9 @@ class classifica_textoBll:
         
         try:
             # Generate embedding for the input text to compare in future
-            query_embedding = self.embeddingsModule.generate_embedding(texto)
+            query_embedding = self.embeddingsModule.generate_embedding(texto,id_a_classificar)
             
-            # Normalize the query embedding
-            query_embedding = query_embedding.astype('float32')
-            
+           
             # Perform similarity search
             return self.search_similarities(query_embedding,
                                             id_a_classificar , 

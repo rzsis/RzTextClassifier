@@ -11,7 +11,7 @@ from common import print_with_time, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
-import gpu_utils
+import gpu_utils as gpu_utilsModule
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
 import faiss
@@ -47,15 +47,16 @@ class sugere_textos_classificarBll:
             self.baseWhereSQLClassificar = """
                                     WHERE Indexado = false
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
-                                    and t.Metodo in ('N','Q','M')
+                                    and t.Metodo in ('N','Q','M')                                    
                                 """
             
             self.baseWhereSQLBuscarSimilar = """
                                     WHERE Indexado = true
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
                                     and t.BuscouSimilar = false                
-                                    and t.Metodo in ('N','Q','M')
-                  """            
+                                    and t.Metodo in ('N','Q','M')                                    
+                  """   
+            self.gpu_utils = gpu_utilsModule.GpuUtils()          
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
 
@@ -104,7 +105,7 @@ class sugere_textos_classificarBll:
             similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
-                    embedding   = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'])
+                    embedding   = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
                     similars    = self._search_qdrant(embedding, row['id'])
                     if len(similars) >= self.min_similars:
                         self._insere_sugestao_textos_classificar(row['id'], similars)                        
@@ -339,10 +340,10 @@ class sugere_textos_classificarBll:
         processed_data = []
         for i, row in enumerate(tqdm(data, desc="Gerando embeddings")):
             try:
-                embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'])
-                # Clear cache every 20 batches
-                if i % 20 == 0:
-                     gpu_utils.GpuUtils().clear_gpu_cache()
+                embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
+                # Clear cache every X batches
+                if i % 10 == 0:
+                     self.gpu_utils.clear_gpu_cache()
 
                 processed_data.append({
                     'Id': row['id'],
@@ -352,7 +353,7 @@ class sugere_textos_classificarBll:
             except Exception as e:
                 self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
                                
-        gpu_utils.GpuUtils().clear_gpu_cache()
+        self.gpu_utils.clear_gpu_cache()
 
         # Insere no Qdrant em lotes menores e atualiza UpInsertOk
         insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
