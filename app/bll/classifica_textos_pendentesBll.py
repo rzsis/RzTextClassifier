@@ -39,7 +39,8 @@ class ClassificaTextosPendentesBll:
                             session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
-            self.gpu_utils = gpu_utilsModule.GpuUtils()         
+            self.gpu_utils = gpu_utilsModule.GpuUtils()     
+            self.limiteItensClassificar = 5000    
 
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
@@ -63,14 +64,14 @@ class ClassificaTextosPendentesBll:
 
     def _fetch_data(self) -> List[RowMapping]:        
         try:
-            query = """
+            query = f"""
                 SELECT t.id,t.TxtTreinamento AS Text                   
                 FROM textos_classificar t            
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
                 AND t.TxtTreinamento <> ''                
                 ORDER BY t.id
-                limit 2000
+                limit {self.limiteItensClassificar}
             """
         
             return self.session.execute(text(query)).mappings().all() # pyright: ignore[reportReturnType]

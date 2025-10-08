@@ -57,8 +57,10 @@ class sugere_textos_classificarBll:
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
                                     and t.BuscouSimilar = false                
                                     and t.Metodo in ('N','Q','M')                                    
-                  """   
-            self.gpu_utils = gpu_utilsModule.GpuUtils()          
+                                """   
+            self.gpu_utils = gpu_utilsModule.GpuUtils()
+            self.limiteItensClassificar = 5000
+                
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
 
@@ -84,7 +86,7 @@ class sugere_textos_classificarBll:
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}
                 ORDER BY t.id                
-                LIMIT 2000                
+                LIMIT {self.limiteItensClassificar}                
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
@@ -215,7 +217,7 @@ class sugere_textos_classificarBll:
                 FROM textos_classificar t
                 {self.baseWhereSQLClassificar}
                 ORDER BY t.id
-                LIMIT 2000
+                LIMIT {self.limiteItensClassificar}
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
