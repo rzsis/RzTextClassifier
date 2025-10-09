@@ -15,6 +15,7 @@ class Qdrant_Utils:
         # Inicializa Qdrant Client
         self._Qdrant_url = localcfg.get("vectordatabasehost")
         self._qdrant_client = None
+        self.CollectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
         self._connect_qDrant()
 
     def _connect_qDrant(self) -> bool:
@@ -28,6 +29,35 @@ class Qdrant_Utils:
             return True
         except Exception as e:
             raise RuntimeError(f"[ERRO] Falha ao conectar no qDrant: {e}")
+        
+    #obtem o cliente do qdrant  
+    def get_client(self):
+        """Cria uma nova sessão (útil para contextos paralelos)."""
+        if self._qdrant_client is None:
+            raise RuntimeError("Não conectado no vectordatabase não inicializado.")
+        return self._qdrant_client
+
+    def dispose(self):
+        """Fecha a conexão com o Qdrant."""
+        if self._qdrant_client is not None:
+            self._qdrant_client.close()  # Use close() instead of dispose()
+            self._qdrant_client = None
+
+    def create_collection(self, pCollection_name: str):
+        try:
+            # Verifica se a coleção existe senão cria
+            collections = self._qdrant_client.get_collections()
+            collection_names = [collection.name for collection in collections.collections]
+            if pCollection_name not in collection_names:
+                self._qdrant_client.create_collection(
+                    collection_name=pCollection_name,
+                    vectors_config=models.VectorParams(size=self.CollectionSize, distance=Distance.DOT)
+                )
+                print_with_time(f"Criada collection Qdrant: {pCollection_name}")
+
+        except Exception as e:
+            raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
+
 
     # -----------------------------
     # Utilitários de versão
@@ -160,32 +190,3 @@ class Qdrant_Utils:
         # Caso compatível, apenas log informativo
         print_with_time(f"Compatibilidade qdrant com client ok: client {client_ver} ~ server {server_ver}")
 
-    # -----------------------------
-    # Operações básicas
-    # -----------------------------
-    def get_client(self):
-        """Cria uma nova sessão (útil para contextos paralelos)."""
-        if self._qdrant_client is None:
-            raise RuntimeError("Não conectado no vectordatabase não inicializado.")
-        return self._qdrant_client
-
-    def dispose(self):
-        """Fecha a conexão com o Qdrant."""
-        if self._qdrant_client is not None:
-            self._qdrant_client.close()  # Use close() instead of dispose()
-            self._qdrant_client = None
-
-    def create_collection(self, pCollection_name: str , embedding_dim:int):
-        try:
-            # Verifica se a coleção existe senão cria
-            collections = self._qdrant_client.get_collections()
-            collection_names = [collection.name for collection in collections.collections]
-            if pCollection_name not in collection_names:
-                self._qdrant_client.create_collection(
-                    collection_name=pCollection_name,
-                    vectors_config=models.VectorParams(size=embedding_dim, distance=Distance.DOT)
-                )
-                print_with_time(f"Criada collection Qdrant: {pCollection_name}")
-
-        except Exception as e:
-            raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")

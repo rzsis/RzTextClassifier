@@ -37,10 +37,9 @@ class sugere_textos_classificarBll:
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
             embeddingsBllModule.initBllEmbeddings(self.session)
-            self.embedding_dim = embeddingsBllModule.bllEmbeddings.dim
             self.qdrant_utils = Qdrant_UtilsModule()
             self.qdrant_client = self.qdrant_utils.get_client()
-            self.qdrant_utils.create_collection(self.collection_name, self.embedding_dim)
+            self.qdrant_utils.create_collection(self.collection_name)
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
@@ -92,7 +91,7 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
-
+    #processa os textos que faltam buscar similares e faz uma pesquisa no qdrant para encontrar textos similares
     def processa_textos_falta_buscar_similar(self):
         try:
             print_with_time(f"Iniciando busca de textos similares...")
@@ -328,6 +327,7 @@ class sugere_textos_classificarBll:
             return []
 
 
+    #pega todos os textos pendentes que não foram processados no qdrant, gera o embedding e insere no qdrant
     def indexa_e_classifica_textos_classificar(self) -> dict:
         print_with_time(f"Iniciando indexação e detecção de textos similares...")
         self.clusters = {} # Reseta cache

@@ -1,186 +1,115 @@
-#embeddingsBll.py
+# embeddingsBll.py
 import os
-#Necessario colocar ja inicio para pegar antes de importar torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
 os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
 
-import json
-from pathlib import Path
-from click import Option
 import numpy as np
-import faiss
-from shtab import Optional
-from sympy import N
 from transformers import AutoTokenizer, AutoModel
 import torch
-from tqdm import tqdm
-from datetime import datetime
-from bll import ids_e_classes_corretasBll
-from common import print_with_time
-from collections import defaultdict
 from db_utils import Session
 import gpu_utils as gpu_utilsModule
-from pydantic import BaseModel
-from typing import List, Optional
-import bll.ids_e_classes_corretasBll  as IdsEClassesCorretasBllModule
+from typing import Dict, List, Optional
+from common import print_with_time
 import logger
+from qdrant_utils import Qdrant_Utils as qdrant_utilsModule
 
 bllEmbeddings = None
 
 def initBllEmbeddings(session=Session):
-    global bllEmbeddings    
+    global bllEmbeddings
     if bllEmbeddings is None:
         try:
-            from main import localconfig  # importa localconfig do main.py                
-            bllEmbeddings = EmbeddingsBll()  # inicializa modelos (carrega embeddings)
-            bllEmbeddings.load_model_and_embendings("train",session)  # carrega os embeddings finais        
+            from main import localconfig
+            bllEmbeddings = EmbeddingsBll()
+            bllEmbeddings.load_model_and_tokenizer()
         except Exception as e:
-            raise RuntimeError(f"Erro Inicializando bllEmbeddings: {e}")            
+            raise RuntimeError(f"Erro Inicializando bllEmbeddings: {e}")
+def get_bllEmbeddings(session=Session):
+    if bllEmbeddings is None:
+        initBllEmbeddings(session)
+    return bllEmbeddings
 
-        
 
 class EmbeddingsBll:
     def __init__(self):
-        from main import localconfig as localcfg  # importa localconfig do main.py            
+        from main import localconfig as localcfg
         self.localconfig = localcfg
-        self.max_length = self.localconfig.get("max_length")                       
-        self.max_txt_lenght = self.max_length*8  # Limite máximo de caracteres para o texto de entrada
-        self.logger = logger.log  
-        self.gpu_utils = gpu_utilsModule.GpuUtils()      
+        self.max_length = self.localconfig.get("max_length")
+        self.max_txt_lenght = self.max_length * 8
+        self.logger = logger.log
+        self.gpu_utils = gpu_utilsModule.GpuUtils()        
+        self.qdrant_client = qdrant_utilsModule().get_client()
+        self.tokenizer = None
+        self.model = None
 
-    # Função para gerar embedding para comparação do texto, transformando o texto em um vetor numérico
-    def generate_embedding(self, text: str, Id: Optional[int]) -> np.ndarray:
+    #Gera embedding para um texto
+    def generate_embedding(self, text: str, Id: Optional[int]) -> np.ndarray:        
         clean_text = ""
         try:
-            # Preprocess text to remove invalid characters and handle edge cases
             if not text or not isinstance(text, str):
                 return None # pyright: ignore[reportReturnType]
-             
-            # Remove non-printable characters (ASCII < 32 or 127)
             clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127)
-            # Limit text length to avoid excessive tokenization
-            clean_text = clean_text[0:self.max_txt_lenght].strip()  # Adjust max length as needed
-            
+            clean_text = clean_text[0:self.max_txt_lenght].strip()
+
             if not clean_text:
-                return None  # pyright: ignore[reportReturnType] # Return None for empty text after preprocessing
+                return None # pyright: ignore[reportReturnType]
             
             inputs = self.tokenizer(
-                clean_text, 
+                clean_text,
                 return_tensors="pt",
                 truncation=True,
                 max_length=self.max_length,
                 padding=True
-            ).to(self.model.device)
-            
-            with torch.no_grad():
-                outputs = self.model(**inputs)                
-                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-                       
-            del inputs, outputs,  # Liberar tensores intermediários
+            ).to(self.model.device) # pyright: ignore[reportOptionalCall]
 
-            # Normalize the query embedding
+            with torch.no_grad():
+                outputs = self.model(**inputs) # pyright: ignore[reportOptionalCall]
+                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            del inputs, outputs
+            
             embedding = embedding.astype('float32')
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = embedding / norm
 
             return embedding
         except Exception as e:
-            raise RuntimeError(f"Erro ao gerar embedding para texto ID = {Id} -> {clean_text} : {e}")  # Log error for debugging            
+            raise RuntimeError(f"Erro ao gerar embedding para texto ID = {Id} -> {clean_text} : {e}")
 
-    #Inicializa os modelos e carrega os embeddings
-    #embedding_type pode ser train ou final
-    def load_model_and_embendings(self, embedding_type: str,session: Session) -> tuple[np.ndarray, np.ndarray]:              
-
-        # define os caminhos dos arquivos de embeddings e metadados
-        if embedding_type == "train":
-            embeddings_file = Path(self.localconfig.getEmbeddingsTrain(),f"train_text.npy")
-            metadata_file = Path(self.localconfig.getEmbeddingsTrain(),f"train_metadata.npz")
-        elif embedding_type == "final":
-            embeddings_file = Path(self.localconfig.getEmbendingFinal(),f"train_final_text.npy")
-            metadata_file = Path(self.localconfig.getEmbendingFinal(),f"train_final_metadata.npz")
-        else:
-            raise RuntimeError("embedding_type deve ser 'train' ou 'final'")
-
-        if not embeddings_file.exists() or not metadata_file.exists():
-            raise RuntimeError(f"Arquivos de embeddings {embeddings_file.stem} ou metadados {metadata_file.stem} não encontrados em {self.localconfig.getEmbendingFinal()}")
-            
-        print_with_time(f"Inicializando modelos e embeddings...")
-        # Carregar tokenizer e modelo para gerar novos embeddings caso necessario
+    def load_model_and_tokenizer(self) -> None:
+        """Carrega o modelo e tokenizer."""
         try:
             model_path = self.localconfig.getModelPath()
-            if (os.path.exists(model_path) == False):
-                raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")                                 
-
+            if not os.path.exists(model_path):
+                raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")
             self.gpu_utils.clear_gpu_cache()
-                
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-            self.model = AutoModel.from_pretrained(model_path,
-                                                   torch_dtype=torch.float32, 
-                                                   attn_implementation="eager").to("cuda" if torch.cuda.is_available() else "cpu")
+            self.model = AutoModel.from_pretrained(
+                model_path,
+                torch_dtype=torch.float32,
+                attn_implementation="eager"
+            ).to("cuda" if torch.cuda.is_available() else "cpu")
+
             self.model.eval()
-
-        
-            print_with_time(f"Modelo e tokenizer carregados de {model_path}")
+            print_with_time(f"Modelo e tokenizer carregados de {model_path} com dimensão {self.model.config.hidden_size}")
         except Exception as e:
-            raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")            
-
-        try:            
-            self.embeddings = np.load(embeddings_file)            
-            self.metadata = np.load(metadata_file, allow_pickle=True)
-            print_with_time(f"Embeddings de referência: {embeddings_file} e metadados: {metadata_file} carregados com sucesso.")            
-        except Exception as e:
-            raise RuntimeError(f"Erro ao carregar embeddings ou metadados para {embeddings_file.stem}: {e}")            
-
-        # Convert NpzFile to dict to improve perfomance
-        self.metadata = {key: self.metadata[key] for key in self.metadata}
-
-        ids = self.metadata["Id"]
-        Classes = self.metadata["Classe"]
-        CodClasse = self.metadata["CodClasse"].astype(int)
-    
-
-        #Verificar consistência entre embeddings e metadados
-        if len(self.embeddings) != len(ids) or len(self.embeddings) != len(CodClasse) or len(self.embeddings) != len(Classes):
-            raise RuntimeError(f"Erro: Inconsistência entre embeddings ({len(self.embeddings)}) e metadados "
-                            f"(ids: {len(ids)}, CodClasse: {len(CodClasse)}, Texts: {len(Classes)})")                 
+            raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")
 
 
-        idsEClassesCorretasBll = IdsEClassesCorretasBllModule.IdsEClassesCorretasBll(session)  # inicializa idsEClassesCorretasBll
-        self.metadata = idsEClassesCorretasBll.corrige_metadata(self.metadata)
-
-
-        # Normalizar embeddings de referência e criar índice FAISS usando normalize_embeddings
-        self.embeddings = self.normalize_embeddings(self.embeddings, "embeddings de referência")
-
-        print_with_time(f"Índice FAISS criado com {self.index.ntotal} vetores.")    
-
-        return self.embeddings, self.metadata     # pyright: ignore[reportReturnType]
-
-
-                
-    #normaliza os embeddings para poder comparar
-    def normalize_embeddings(self, embeddings: np.ndarray, context: str = "embeddings") -> np.ndarray:        
+    def search_similar(self, text: str, collection_name: str, k: int = 20) -> List[Dict]:
+        """Busca os k vetores mais similares no Qdrant."""
         try:
-            # Verificar se há NaN ou Inf nos embeddings
-            if np.any(np.isnan(embeddings)) or np.any(np.isinf(embeddings)):
-                raise RuntimeError(f"Erro: Embedding inválido (NaN ou Inf) para {context}")
-                    
-            # Converter para float32 e normalizar embeddings
-            embeddings = embeddings.astype('float32')
-            faiss.normalize_L2(embeddings)
+            query_embedding = self.generate_embedding(text, None)
+            if query_embedding is None:
+                raise RuntimeError("Não foi possível gerar embedding para o texto fornecido.")
             
-            # Limpar cache da GPU, se disponível e necessário
-            self.gpu_utils.clear_gpu_cache()
+            results = self.qdrant_client.search(
+                collection_name=collection_name,
+                query_vector=query_embedding.tolist(),
+                limit=k,
+                with_payload=True
+            )
             
-            # Criar índice FAISS (mantido na CPU)
-            self.dim = embeddings.shape[1]
-            self.index = faiss.IndexFlatIP(self.dim)  # Inner Product para cosine similarity
-            self.index.add(embeddings) # pyright: ignore[reportCallIssue]
-
-            # Verificar se todos os vetores foram adicionados ao índice
-            if self.index.ntotal != len(embeddings):
-                raise RuntimeError(f"Erro: {self.index.ntotal} vetores adicionados ao índice, esperado {len(embeddings)}")
-            
-            return embeddings
-        
+            return [{"payload": r.payload, "score": r.score} for r in results]
         except Exception as e:
-            raise RuntimeError(f"Erro ao normalizar embeddings para {context}: {e}")             
-        
+            raise RuntimeError(f"Erro ao buscar vetores similares no Qdrant: {e}")

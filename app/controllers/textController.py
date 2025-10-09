@@ -37,9 +37,7 @@ async def ClassificaTexto(texto: str,
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em ClassificaTexto : {str(e)}")
     
-
     
-
 #classifica os textos pendentes em textos_classificar
 @router.post("/classifica_textos_pendentes")
 async def classifica_textos_pendentes(session: Session = Depends(get_session_db)  ):        

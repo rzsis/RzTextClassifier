@@ -20,9 +20,9 @@ async def GenerateEmbeddings(split: str,
         if split not in ["train", "final"]:
             raise HTTPException(status_code=400, detail="split deve ser 'train' ou 'final'")    
         
-        generator = bllGenerateEmbeddings(split, session=db, localcfg=localcfg)        
-        generator.start()
-        return {"status": "success", "message": f"Embeddings generated for split "}
+        generator = bllGenerateEmbeddings(session=db)        
+        return generator.start()
+        
     except Exception as e:        
         raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
     
