@@ -1,4 +1,6 @@
 # qdrant_utils.py
+from aiohttp import Payload
+import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue
@@ -13,15 +15,15 @@ class Qdrant_Utils:
     def __init__(self):
         from main import localconfig as localcfg
         # Inicializa Qdrant Client
-        self._Qdrant_url = localcfg.get("vectordatabasehost")
+        self.qdrant_url = localcfg.get("vectordatabasehost")
         self._qdrant_client = None
-        self.CollectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
+        self.collectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
         self._connect_qDrant()
 
     def _connect_qDrant(self) -> bool:
         try:
-            self._qdrant_client = QdrantClient(url=self._Qdrant_url, timeout=60)
-            print_with_time(f"QdrantClient inicializado com URL: {self._Qdrant_url}")
+            self._qdrant_client = QdrantClient(url=self.qdrant_url, timeout=60)
+            print_with_time(f"QdrantClient inicializado com URL: {self.qdrant_url}")
 
             # checar compatibilidade client x server
             self._check_client_server_compatibility()
@@ -37,6 +39,18 @@ class Qdrant_Utils:
             raise RuntimeError("Não conectado no vectordatabase não inicializado.")
         return self._qdrant_client
 
+    #facilita a obtenção do nome da coleção
+    def get_collection_name(self, collection_type: str) -> str:
+        from main import localconfig as localcfg
+        codcli = localcfg.get("codcli")
+        if (collection_type == "final"):
+            return f"v{codcli}_textos_final"
+        elif (collection_type == "train"):
+            return f"v{codcli}_textos_train"
+        else:
+            raise RuntimeError(f"get_collection_name só suporta 'final' ou 'train', recebeu: {collection_type}")
+    
+
     def dispose(self):
         """Fecha a conexão com o Qdrant."""
         if self._qdrant_client is not None:
@@ -51,17 +65,45 @@ class Qdrant_Utils:
             if pCollection_name not in collection_names:
                 self._qdrant_client.create_collection(
                     collection_name=pCollection_name,
-                    vectors_config=models.VectorParams(size=self.CollectionSize, distance=Distance.DOT)
+                    vectors_config=models.VectorParams(size=self.collectionSize, distance=Distance.DOT)
                 )
                 print_with_time(f"Criada collection Qdrant: {pCollection_name}")
 
         except Exception as e:
             raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
 
+    ##busca embeddings similares no qdrant
+    def search_embedding(self, embedding: np.ndarray,
+                        collection_name: str,
+                        limite_itens: int,
+                        similarity_threshold: float) -> list[dict]:
+        try: 
+            high_similars = []                                 
+            search_results = self._qdrant_client.search(
+                collection_name=collection_name,
+                query_vector=embedding.flatten().tolist(),
+                limit=limite_itens,
+                score_threshold=similarity_threshold
+            )
+            high_similars = [
+                {
+                    "IdEncontrado": int(res.payload["id"]),  # pyright: ignore[reportOptionalSubscript]
+                    "Similaridade": res.score, # type: ignore
+                    "Classe": res.payload["Classe"],                 # pyright: ignore[reportOptionalSubscript]
+                    "CodClasse": res.payload["CodClasse"]                 # pyright: ignore[reportOptionalSubscript]
+                }
+                for res in search_results                
+            ]
+            
 
-    # -----------------------------
+            return high_similars
+        
+        except Exception as e:
+            self.logger.error(f"Erro ao buscar similares no Qdrant {e}")
+            return []
+            
+
     # Utilitários de versão
-    # -----------------------------
     def _parse_semver(self, v: str) -> tuple[int, int, int]:
         """
         Converte '1.15.1' em (1, 15, 1). Ignora sufixos como '-rc', '-beta' etc.
@@ -79,7 +121,7 @@ class Qdrant_Utils:
         com fallbacks em /version, headers de /collections e /.
         Retorna "" se não conseguir detectar.
         """
-        base = self._Qdrant_url.rstrip("/")
+        base = self.qdrant_url.rstrip("/")
 
         # 1) /telemetry  → espera-se "result.app.version"
         try:
@@ -169,7 +211,7 @@ class Qdrant_Utils:
         # Se não conseguirmos obter a versão do servidor, não bloqueia — apenas informa.
         if not server_ver:
             print_with_time(
-                f"[AVISO] Não foi possível detectar a versão do servidor Qdrant em {self._Qdrant_url}. "
+                f"[AVISO] Não foi possível detectar a versão do servidor Qdrant em {self.qdrant_url}. "
                 f"Versão do client: {client_ver}"
             )
             return

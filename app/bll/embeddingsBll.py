@@ -48,6 +48,7 @@ class EmbeddingsBll:
         try:
             if not text or not isinstance(text, str):
                 return None # pyright: ignore[reportReturnType]
+            
             clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127)
             clean_text = clean_text[0:self.max_txt_lenght].strip()
 
@@ -65,6 +66,7 @@ class EmbeddingsBll:
             with torch.no_grad():
                 outputs = self.model(**inputs) # pyright: ignore[reportOptionalCall]
                 embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+
             del inputs, outputs
             
             embedding = embedding.astype('float32')
@@ -82,6 +84,7 @@ class EmbeddingsBll:
             model_path = self.localconfig.getModelPath()
             if not os.path.exists(model_path):
                 raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")
+            
             self.gpu_utils.clear_gpu_cache()
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.model = AutoModel.from_pretrained(
@@ -92,6 +95,11 @@ class EmbeddingsBll:
 
             self.model.eval()
             print_with_time(f"Modelo e tokenizer carregados de {model_path} com dimensão {self.model.config.hidden_size}")
+
+            if self.model.config.hidden_size > 1024:
+                raise RuntimeError(f"Dimensão do embedding maior que 1024 não suportado.")
+                        
+
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")
 

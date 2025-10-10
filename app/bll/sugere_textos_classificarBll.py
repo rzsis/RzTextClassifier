@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing_extensions import runtime
 import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -14,7 +15,6 @@ from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllM
 import gpu_utils as gpu_utilsModule
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
-import faiss
 from collections.abc import Sequence
 import torch
 
@@ -257,9 +257,7 @@ class sugere_textos_classificarBll:
             self.session.rollback()
 
     def _insert_texto_qdrant(self, id_texto: int, embedding: np.ndarray):
-        try:
-            embedding = embedding.astype('float32')
-            faiss.normalize_L2(embedding)
+        try:           
             point = PointStruct(id=id_texto, vector=embedding.flatten().tolist(), payload={"id": id_texto})
             self.qdrant_client.upsert(
                 collection_name=self.collection_name,
@@ -273,8 +271,7 @@ class sugere_textos_classificarBll:
         try:
             points = []
             for item in tqdm(processed_data, desc="Inserindo dados no Qdrant"):
-                embedding = item['Embedding'].astype('float32')
-                faiss.normalize_L2(embedding)
+                embedding = item['Embedding']
                 points.append(PointStruct(
                     id=item['Id'],
                     vector=embedding.flatten().tolist(),
@@ -305,8 +302,7 @@ class sugere_textos_classificarBll:
 
     def _search_qdrant(self, embedding: np.ndarray, id_texto: int) -> list[dict]:
         try:
-            embedding = embedding.astype('float32')
-            faiss.normalize_L2(embedding)
+            RuntimeError("Trocar para buscar_embedding de qdrant_utils")
             search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=embedding.flatten().tolist(),

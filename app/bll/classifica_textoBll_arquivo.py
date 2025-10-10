@@ -9,17 +9,15 @@ from sqlalchemy import text
 import bll.log_ClassificacaoBll as log_ClassificacaoBllModule
 from bll.embeddingsBll import EmbeddingsBll  # Importing the original module
 from collections import defaultdict
+import faiss
 from transformers import AutoTokenizer
 from sqlalchemy.orm import Session
-from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 
 class classifica_textoBll:
     def __init__(self, embeddingsModule: EmbeddingsBll, session: Session):        
         self.embeddingsModule = embeddingsModule          
         self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)
         self.session = session  
-        self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance
-        self.collection_name = self.qdrant_utils.get_collection_name("final")  # Get collection name
         
 
     # Pydantic model classes
@@ -59,15 +57,22 @@ class classifica_textoBll:
 
     def search_similarities(self, query_embedding: np.ndarray, id_a_classificar:Optional[int] = None, 
                                 TabelaOrigem:Optional[str] = "", 
-                                itens_limit: int = 20,
+                                top_k: int = 20,
                                 gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
         min_similarity = 0.8
         try:
-            results = self.qdrant_utils.search_embedding(query_embedding,
-                                                         self.collection_name,
-                                                         itens_limit,
-                                                         min_similarity)
-                    
+            faiss.normalize_L2(query_embedding)
+            
+            distances, indices = self.embeddingsModule.index.search(query_embedding, top_k) # pyright: ignore[reportCallIssue]
+            results = [
+                {
+                    "IdEncontrado": self.embeddingsModule.metadata["Id"][idx],
+                    "Similaridade": float(dist),
+                    "Classe": self.embeddingsModule.metadata["Classe"][idx],
+                    "CodClasse": int(self.embeddingsModule.metadata["CodClasse"][idx])
+                }
+                for dist, idx in zip(distances[0], indices[0]) if idx != -1 and float(dist) > min_similarity
+            ]
             if not results:
                 return self.ResultadoSimilaridade(
                     IdEncontrado=None,
@@ -81,8 +86,9 @@ class classifica_textoBll:
                     ListaClassesInfo=None
                 )
 
-            classe_map = {r["CodClasse"]: r["Classe"] for r in results}
-            
+            # Create mapping of CodClasse to Classe
+            classe_map = dict(zip(self.embeddingsModule.metadata["CodClasse"], self.embeddingsModule.metadata["Classe"]))
+
             # Process results
             medias_por_classe = defaultdict(list)
             contagem_por_classe = defaultdict(int)

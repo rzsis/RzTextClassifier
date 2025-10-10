@@ -34,7 +34,7 @@ class GenerateIdsIguaisCollindgs:
         self.k = 50  # Number of nearest neighbors to search
         self.id_iguais_bll = IdIguaisBllModule(session)
         self.id_colliding_bll = IdCollidingBllModule(session)
-        self.generate_embeddings = Embeddings_GenerateBll('train', session, localcfg)
+        self.generate_embeddings = Embeddings_GenerateBll(session)
         self.embeddings_handler = EmbeddingsBll()
 
     def _fetch_data(self) -> list:        

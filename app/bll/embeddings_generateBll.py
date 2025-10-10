@@ -18,18 +18,16 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import PointStruct
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
-import faiss
 from bll.embeddingsBll import get_bllEmbeddings
+import qdrant_utils
 
 
 #gera embeddings dos dados contidos na tabela textos_treinamento
 class Embeddings_GenerateBll:
-    def __init__(self,  session: Session):
-        from main import localconfig        
+    def __init__(self,  session: Session):     
         self.session = session
         self.localconfig = localconfig
         self.config = localconfig.read_config()
-        self.collection_name = f"v{localconfig.get('codcli')}_textos_treinamento"
         self.embeddingsTrain = localconfig.getEmbeddingsTrain()
         self.model_path = Path(self.config["model_path"])
         self.max_length = self.config["max_length"]
@@ -40,25 +38,21 @@ class Embeddings_GenerateBll:
         self.model = None
         self.ids_duplicados = IdsDuplicados(session)
         self.gpu_utils = gpu_utilsModule.GpuUtils()
-        self.qdrant_utils = Qdrant_UtilsModule()
-        self.qdrant_client = self.qdrant_utils.get_client()
-        self.qdrant_utils.create_collection(self.collection_name)
+
+        self.qdrant_utils       = Qdrant_UtilsModule()             
+        self.qdrant_client      = self.qdrant_utils.get_client()        
+        self.collection_name    = self.qdrant_utils.get_collection_name("final")        
+        self.qdrant_utils.create_collection(self.collection_name)           
+
         self.bllEmbeddings = get_bllEmbeddings(session)
-        self.limiteItensClassificar = 5000  
+        self.limiteItensClassificar = 1000  
         self.baseWhereSQL = """
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
                                 AND not t.id in (Select id from idsduplicados)
                                 AND not t.id in (Select id from idsiguais)
                                 and t.Indexado = false
-                                and QtdPalavras <= 1024
-                                and t.id in (
-                                    34397493,
-                                    34398205,
-                                    34441817,
-                                    34441916,
-                                    34443568
-                                    )
+                                and QtdPalavras <= 1024                              
                             """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
 
         # Validate model directory
@@ -166,7 +160,7 @@ class Embeddings_GenerateBll:
 
 
             if idsToUpdate:
-                tmpError += self._update_indexados_in_ids(idsToUpdate)#atualiza os ids que foram processados com sucesso
+                tmpError += self._mark_lista_as_indexado(idsToUpdate)#atualiza os ids que foram processados com sucesso
 
 
             return tmpError,len(idsToUpdate) # tudo certo retorna string vazia
@@ -178,7 +172,7 @@ class Embeddings_GenerateBll:
             return tmpError,0
         
     #atualiza os ids que foram processados com sucesso
-    def _update_indexados_in_ids(self,ids: list[int]) -> str:
+    def _mark_lista_as_indexado(self,ids: list[int]) -> str:
             tmpError = ""
             try:
                 # Atualiza o campo indexado para os IDs inseridos com sucesso
@@ -259,21 +253,22 @@ class Embeddings_GenerateBll:
         else:
             return "",result[1] # se tiver tudo certo retorna string vazia
         
-        
-    
-    ###Insere uma lista de embeddings e metadados no Qdrant.
+            
+    #Insere uma lista de embeddings e metadados no Qdrant.
     def _insert_lista_texto_qdrant(self, processed_data: list[dict]) -> list[dict]:
         try:
-            tmp = ""
             points = []
             for item in tqdm(processed_data, desc="Preparando pontos para Qdrant"):
-                embedding = item['Embedding'].astype('float32')
-                faiss.normalize_L2(embedding)
+                embedding = item['Embedding']
+                # Valida dimensão do embedding
+                if embedding.shape[-1] != self.max_length:
+                    raise ValueError(f"Dimensão do embedding ({embedding.shape[-1]}) não corresponde a CollectionSize ({self.max_length}) para Id {item['Id']}")
+                
                 points.append(PointStruct(
                     id=item['Id'],
                     vector=embedding.flatten().tolist(),
                     payload={
-                        "id": item['Id'],
+                        "id": item['Metadata']['Id'],
                         "Classe": item['Metadata']['Classe'],
                         "CodClasse": item['Metadata']['CodClasse'],
                         "QtdItens": item['Metadata']['QtdItens']
@@ -282,20 +277,18 @@ class Embeddings_GenerateBll:
 
             result = self.qdrant_client.upsert(
                 collection_name=self.collection_name,
-                points=points
+                points=points,
+                wait=True
             )
 
             if result.status == "completed":
                 for item in processed_data:
                     item['UpInsertOk'] = True
-
                 print_with_time(f"Inseridos {len(processed_data)} textos no Qdrant com sucesso.")
             else:
                 for item in processed_data:
                     item['UpInsertOk'] = False
-
-                tmp = f"Falha ao inserir textos no Qdrant: status {result.status}"
-                print_with_time(tmp)
+                print_with_time(f"Falha ao inserir textos no Qdrant: status {result.status}")
 
             return processed_data
         
@@ -303,9 +296,8 @@ class Embeddings_GenerateBll:
             print_with_time(f"Erro ao inserir lista de textos no Qdrant: {e}")
             for item in processed_data:
                 item['UpInsertOk'] = False
-
             return processed_data
-
+    
     #Inicia o processo de geração de embeddings
     def start(self):
         dados = self._fetch_data()
