@@ -21,7 +21,6 @@ class classifica_textoBll:
         self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance
         self.collection_name = self.qdrant_utils.get_collection_name("final")  # Get collection name
         
-
     # Pydantic model classes
     class ItemSimilar(BaseModel):
         IdEncontrado: Optional[int]

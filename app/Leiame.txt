@@ -1,17 +1,31 @@
 Objetivo deste microserviço é gerar um banco com embbedings para comparar textos através de similaridade
 Para se gerar o dataset necessário é necessario seguir os passos a seguir
 
-Objetivo macro do algoritimo
+Objetivo macro do Algoritimo
 
-1º Caso para tr
-1º Gerar embbedings através do endereço http://10.1.1.95:5020/generateembeddings?split=train
+1º primeiro popular um banco de dados vetorial com embbedings baseado na tabela textos_treinamento
+
+2º Uma vez populada a tabela o sistema procura Ids altamente semelhantes para não criar duplicadas na collection do banco vetorial, estes ids tem a mesma classe porem
+    o texto é altamente semelhante
+
+3º O sistema procura ids que estão classificados errados , o conceito é procurar textos muito parecidos com classes diferentes dando a opção pro usuario
+    reclassificar estes ids
+
+4º Após isso o usuario deve corrigir os textos em ids colidentes
+
+5º deve se popular o banco de dados com textos_classificar sem que estes dados sejam previamente treinados em textos_treinamento aplicar os algoritimos para classificar
+    corrigir os resultados
+
+
+Passos para execução do sistema
+1º Gerar embbedings através do endereço http://10.1.1.95:5020/generateembeddings
     Como dica de otimização a primeira que é gerado se o banco tiver muitos idsiguais pode se chamar api para ela e começar denovo pois o sistema só ira processar textos unicos
 
-2º Encontrar ids altamente semelhantes através do endereço  http://10.1.1.95:5020/generateembeddings?split=train
+2º Encontrar ids altamente semelhantes através do endereço  http://10.1.1.95:5020/generate_ids_iguais
 
-3º Encontrar ids colidentes ou seja altamente conflitantes que tenham algo grau de similaridade chamando a api  http://187.85.181.118:18020/generate_ids_colidentes
+3º Encontrar ids colidentes ou seja altamente conflitantes que tenham algo grau de similaridade chamando a api  http://10.1.1.95:18020/generate_ids_colidentes
 
-4º Gerar a base final com o split final em http://10.1.1.95:5020/generateembeddings?split=final
+
 
 
 

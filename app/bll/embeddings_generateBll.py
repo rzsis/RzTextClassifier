@@ -1,6 +1,8 @@
+import datetime
 import os
 from pathlib import Path
 import re
+import time
 from sympy import false
 from typing_extensions import runtime
 import numpy as np
@@ -45,7 +47,7 @@ class Embeddings_GenerateBll:
         self.qdrant_utils.create_collection(self.collection_name)           
 
         self.bllEmbeddings = get_bllEmbeddings(session)
-        self.limiteItensClassificar = 1000  
+        self.limiteItensClassificar = 5000  
         self.baseWhereSQL = """
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
@@ -300,18 +302,23 @@ class Embeddings_GenerateBll:
     
     #Inicia o processo de geração de embeddings
     def start(self):
+        iniTime = time.time()  
+        print_with_time(f"Iniciando processamento de geração de embeddings... : {iniTime}")
         dados = self._fetch_data()
         print_with_time(f"Total de registros a processar: {len(dados)}")
-        
         tmpErros = ""
         processados = 0
+
         # Divide os dados em lotes
-        for i in tqdm(range(0, len(dados), self.batch_size), desc="Processando lotes"):
+        for i in tqdm(range(0, len(dados), self.batch_size), desc=f"Processando lote"):
             batch_dados = dados[i:i + self.batch_size]
             result = self._process_data(batch_dados)
             tmpErros += result[0]
             processados += result[1]
         
+        elapsed = time.time() - iniTime
+        print_with_time(f"Processamento finalizado. Total processado: {processados}. Duração: {elapsed/60:.2f} min")
+
         if tmpErros != "":
             return {"status": "Processado com erros",
                     "message": f"Erros {tmpErros} faltam processar {self._get_data_to_process()} registros. processados {processados} registros."}

@@ -1,4 +1,7 @@
 # qdrant_utils.py
+from ast import Dict
+from typing import Any, Optional
+import venv
 from aiohttp import Payload
 import numpy as np
 from qdrant_client import QdrantClient
@@ -101,8 +104,45 @@ class Qdrant_Utils:
         except Exception as e:
             self.logger.error(f"Erro ao buscar similares no Qdrant {e}")
             return []
-            
+        
+    def get_id(self, id: int, collection_name: str) -> Optional[dict[str, Any]]:
+        try:
+            records = self._qdrant_client.retrieve(
+                collection_name=collection_name,
+                ids=[id],
+                with_vectors=True,
+                with_payload=["Classe", "CodClasse"]
+            )
+            if not records:
+                print_with_time(f"Aviso: Id {id} não encontrado no Qdrant, pulando")
+                return None
 
+            rec = records[0]
+            vec = rec.vector
+            if vec is None:
+                print_with_time(f"Aviso: Id {id} não possui vetor no Qdrant, pulando")
+                return None
+
+            try:
+                embedding = list(map(float, vec))  # Converte diretamente para list[float]
+                if len(embedding) != self.collectionSize:
+                    print_with_time(f"Aviso: Vetor do Id {id} tem dimensão {len(embedding)}, esperado {self.collectionSize}")
+                    return None
+            except Exception:
+                print_with_time(f"Aviso: Vetor do Id {id} não é numérico, pulando")
+                return None
+
+            payload = rec.payload or {}
+            return {
+                "IdEncontrado": int(rec.id),
+                "Classe": payload.get("Classe"),
+                "CodClasse": payload.get("CodClasse"),
+                "Embedding": embedding
+            }
+        except Exception as e:
+            print_error(f"Erro ao recuperar embedding para Id {id}: {e}")
+            return None
+            
     # Utilitários de versão
     def _parse_semver(self, v: str) -> tuple[int, int, int]:
         """
