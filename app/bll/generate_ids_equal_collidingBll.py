@@ -179,7 +179,10 @@ class GenerateIdsIguaisCollindgs:
         auxFilter = " and BuscouIgual = false and BuscouColidente = false "
         data = self._fetch_data(auxFilter)
         if len(data) == 0:
-            return "Nenhum registro pendente para procurar ids iguais."
+            return  {
+                "status": "Sucesso",
+                "message":  "Nenhum registro pendente para procurar ids iguais.",
+                }
       
         # Process similarities
         removed_count = 0
