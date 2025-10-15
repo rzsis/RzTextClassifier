@@ -18,12 +18,6 @@ import qdrant_utils
 
 class GenerateIdsIguaisCollindgs:
     def __init__(self, session: Session, localcfg):
-        """
-        Initialize the class for detecting similar text embeddings using Qdrant.
-        Args:
-            session (Session): SQLAlchemy session for database operations.
-            localcfg: The localconfig module to read configuration.
-        """
         self.session = session
         self.localconfig = localcfg
         self.config = localcfg.read_config()
@@ -40,15 +34,30 @@ class GenerateIdsIguaisCollindgs:
         self.baseWhereSQL = """
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
-                                AND not t.id in (Select id from idsduplicados)
-                                AND not t.id in (Select id from idsiguais)
-                                and t.Indexado = true
-                                and QtdPalavras <= 1024                              
+                                and not t.id in (Select id from idsduplicados)                                
+                                and not t.id in (Select id from idsiguais)
+                                and not t.id in (Select idIgual from idsiguais)                                
+                                and t.Indexado = true 
+                                and QtdPalavras <= 1024                                                           
                             """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
         self.limiteItensClassificar = self.localconfig.get("text_limit_per_batch")
 
+    #get the count of data to be processed
+    def _get_data_to_process(self,auxFilter) -> int:
+        try:
+            query = f"""
+                SELECT COUNT(t.id) AS TotalTextosPendentes
+                FROM textos_treinamento t    
+                {self.baseWhereSQL} 
+                {auxFilter}               
+            """            
+            return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ontendo _get_Textos_Pendentes: {e}")
+        
     #faz a consulta no banco de dados para obter os dados a serem processados
-    def _fetch_data(self) -> list:        
+    def _fetch_data(self, auxFilter) -> list:        
         query = f"""
             SELECT MIN(t.id) AS Id,
                    c.CodClasse,
@@ -58,10 +67,12 @@ class GenerateIdsIguaisCollindgs:
             FROM textos_treinamento t
                     INNER JOIN classes c ON c.CodClasse = t.CodClasse
                     {self.baseWhereSQL}
+                    {auxFilter}
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
             Order by COUNT(t.id) DESC
             limit {self.limiteItensClassificar}
         """
+
         # Busca dados do banco de dados
         try:
             result = self.session.execute(text(query)).mappings().all()
@@ -78,7 +89,8 @@ class GenerateIdsIguaisCollindgs:
         """
         similarity_threshold_colliding = 0.94
         # Load data from database
-        data = self._fetch_data()
+        auxFilter = " and BuscouIgual = true and BuscouColidente = false "
+        data = self._fetch_data(auxFilter)
         
         # Process similarities
         removed_count = 0
@@ -125,17 +137,14 @@ class GenerateIdsIguaisCollindgs:
                     continue
 
                 # Mark for removal if similarity exceeds threshold and different class
-                if sim >= similarity_threshold_colliding and item["CodClasse"] != neighbor_cod_classe:
-                    neighbor_orig_idx = json_id_to_index.get(neighbor_id)
-                    if neighbor_orig_idx is None:
-                        continue
+                if sim >= similarity_threshold_colliding and item["CodClasse"] != neighbor_cod_classe:                   
                     # Check if neighbor_id is already in lista_ids_collidentes
                     already_exists = any(
                         id_collidente.IdColidente == neighbor_id
                         for id_collidente in lista_ids_collidentes
                     )
                     if not already_exists:
-                        items_to_remove.add(neighbor_orig_idx)
+                        items_to_remove.add(neighbor_id)
                         lista_ids_collidentes.append(
                             idCollidingModule.IdsColidentes(
                                 Id=id_tram,
@@ -145,11 +154,7 @@ class GenerateIdsIguaisCollindgs:
                         )
             keep_indices -= items_to_remove
             removed_count += len(items_to_remove)
-        # Clear previous records
-        try:
-            self.id_colliding_bll.limpa_registros()
-        except Exception as e:
-            raise RuntimeError(f"Erro ao limpar registros da tabela idscolidentes: {e}")
+
         # Insert idscolidentes into database
         try:
             itens_inseridos = self.id_colliding_bll.commit_lista(lista_ids_collidentes)
@@ -160,18 +165,22 @@ class GenerateIdsIguaisCollindgs:
         except Exception as e:
             print_error(f"Erro ao inserir IdsColidentes no banco: {e}")
             raise
-        print_with_time(f"Processamento de colisões concluído")
+        
         print_with_time(f"Registros removidos: {removed_count}")
+        return 
 
-    def _generate_ids_equal(self) -> None:
+    #Processa todos os textos contidos em textos_treinamento para encontrar ids com uma similaridade alta e mesma classe
+    def _generate_ids_equal(self):
         """
         Process a dataset to find similar items (high similarity, same class) and save to database.
         """
         similarity_threshold_equal = 0.985
         # Load data from database
-        data = self._fetch_data()
-        # Create mapping of Id to data index
-       
+        auxFilter = " and BuscouIgual = false and BuscouColidente = false "
+        data = self._fetch_data(auxFilter)
+        if len(data) == 0:
+            return "Nenhum registro pendente para procurar ids iguais."
+      
         # Process similarities
         removed_count = 0
         keep_indices = set(range(len(data)))
@@ -207,7 +216,6 @@ class GenerateIdsIguaisCollindgs:
                 print_with_time(f"Erro ao buscar similares para Id {id_tram}: {e}")
                 continue
 
-            items_to_remove = set()
             for similar_item in results:
                 sim = similar_item.Similaridade or 0
                 neighbor_id = similar_item.IdEncontrado
@@ -216,42 +224,44 @@ class GenerateIdsIguaisCollindgs:
                     continue
 
                 # Mark for removal if similarity exceeds threshold and same class
-                if sim >= similarity_threshold_equal and item["CodClasse"] == neighbor_cod_classe:
-                    neighbor_orig_idx = json_id_to_index.get(neighbor_id)
-                    if neighbor_orig_idx is None:
-                        continue
-                    items_to_remove.add(neighbor_orig_idx)
+                if sim >= similarity_threshold_equal and item["CodClasse"] == neighbor_cod_classe:                
                     lista_ids_iguais.append(
                         idIguaisModule.IdsIguais(id=id_tram, idIgual=neighbor_id)
                     )
-            keep_indices -= items_to_remove
-            removed_count += len(items_to_remove)
-
-        # Clear previous records
-        try:
-            self.id_iguais_bll.limpa_registros()
-        except Exception as e:
-            raise RuntimeError(f"Erro ao limpar registros da tabela idsiguais: {e}")
+          
         # Insert duplicates into database
         try:
-            itens_inseridos = self.id_iguais_bll.commit_lista(lista_ids_iguais)
+            itens_inseridos = self.id_iguais_bll.commit_lista_ids_iguais(lista_ids_iguais)
             if itens_inseridos > 0:
                 print_with_time(f"IdsIguais inseridos no banco em IdsIguais: {itens_inseridos}")
             else:
                 print_with_time("Nenhum IdsIguais inserido, lista vazia ou erro na inserção.")
+
         except Exception as e:
             print_error(f"Erro ao inserir IdsIguais no banco: {e}")
             raise
-        print_with_time(f"Processamento de Ids Iguais concluído")
-        print_with_time(f"Registros removidos: {removed_count}")
+        
+        # Update BuscouIgual para os itens processados
+        listaIds = (item["Id"] for item in data)
+        self.id_iguais_bll.set_buscou_igual(listaIds)
+        
+
+        strRetorno = f"Processados {len(data)} textos, faltam {self._get_data_to_process(auxFilter)}, removidos {len(lista_ids_iguais)}."
+        print_with_time(strRetorno)
+
+        return  {
+                "status": "Sucesso",
+                "message": strRetorno,
+                }
 
     def generate_ids_iguais_start(self):
         """
         Start processing the dataset for equal IDs.
         """
         print_with_time(f"Iniciando processamento de search_ids_iguais...")
-        self._generate_ids_equal()
-        print_with_time("Processamento completo! Execute generate_ids_iguais para gerar ids iguais.")
+        result = self._generate_ids_equal()
+        print_with_time(result)
+        return result
 
     def generate_ids_colliding_start(self):
         """

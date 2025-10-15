@@ -51,8 +51,7 @@ class Embeddings_GenerateBll:
         self.baseWhereSQL = """
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
-                                AND not t.id in (Select IdDuplicado from idsduplicados)
-                                AND not t.id in (Select id from idsiguais)
+                                AND not t.id in (Select IdDuplicado from idsduplicados)                                
                                 and t.Indexado = false
                                 and QtdPalavras <= 1024                              
                             """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
