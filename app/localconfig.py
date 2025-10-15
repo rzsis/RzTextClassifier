@@ -33,9 +33,10 @@ def checkRequiredKeys():
         "http_port",
         "dataset_path",
         "batch_size",
-        "max_length",
-        "vectordatabasehost",
-        "codcli"
+        "max_length", #tamanho máximo do texto para gerar o embedding
+        "vectordatabasehost", #endereço do banco qdrant
+        "codcli", ##codigo do cliente na base de dados
+        "text_limit_per_batch" # Limite de textos por lote para classificação
     ]
 
     missing_keys = [key for key in required_keys if key not in __configReaded]

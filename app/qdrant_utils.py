@@ -68,20 +68,23 @@ class Qdrant_Utils:
             if pCollection_name not in collection_names:
                 self._qdrant_client.create_collection(
                     collection_name=pCollection_name,
-                    vectors_config=models.VectorParams(size=self.collectionSize, distance=Distance.DOT)
+                    vectors_config=models.VectorParams(size=self.collectionSize,
+                                                       distance=Distance.COSINE  
+                                                    )
                 )
                 print_with_time(f"Criada collection Qdrant: {pCollection_name}")
 
         except Exception as e:
             raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
 
-    ##busca embeddings similares no qdrant
+    # Busca embeddings similares no qdrant
     def search_embedding(self, embedding: np.ndarray,
                         collection_name: str,
                         limite_itens: int,
                         similarity_threshold: float) -> list[dict]:
         try: 
-            high_similars = []                                 
+            high_similars = []         
+            embedding = np.array(embedding, dtype=float)                                    
             search_results = self._qdrant_client.search(
                 collection_name=collection_name,
                 query_vector=embedding.flatten().tolist(),
@@ -90,10 +93,10 @@ class Qdrant_Utils:
             )
             high_similars = [
                 {
-                    "IdEncontrado": int(res.payload["id"]),  # pyright: ignore[reportOptionalSubscript]
+                    "IdEncontrado": int(res.id),  
                     "Similaridade": res.score, # type: ignore
-                    "Classe": res.payload["Classe"],                 # pyright: ignore[reportOptionalSubscript]
-                    "CodClasse": res.payload["CodClasse"]                 # pyright: ignore[reportOptionalSubscript]
+                    "Classe": (res.payload or {}).get("Classe"),                
+                    "CodClasse": (res.payload or {}).get("CodClasse")                 
                 }
                 for res in search_results                
             ]
@@ -102,7 +105,7 @@ class Qdrant_Utils:
             return high_similars
         
         except Exception as e:
-            self.logger.error(f"Erro ao buscar similares no Qdrant {e}")
+            print_with_time(f"Erro ao buscar similares no Qdrant {e}")
             return []
         
     def get_id(self, id: int, collection_name: str) -> Optional[dict[str, Any]]:
@@ -119,12 +122,16 @@ class Qdrant_Utils:
 
             rec = records[0]
             vec = rec.vector
+            if isinstance(vec, dict):
+                vec = vec.get(self.vector_name)  # por ex. "text"            
+                
             if vec is None:
                 print_with_time(f"Aviso: Id {id} não possui vetor no Qdrant, pulando")
                 return None
 
             try:
-                embedding = list(map(float, vec))  # Converte diretamente para list[float]
+                embedding = [float(x) for x in vec]
+
                 if len(embedding) != self.collectionSize:
                     print_with_time(f"Aviso: Vetor do Id {id} tem dimensão {len(embedding)}, esperado {self.collectionSize}")
                     return None
@@ -137,7 +144,7 @@ class Qdrant_Utils:
                 "IdEncontrado": int(rec.id),
                 "Classe": payload.get("Classe"),
                 "CodClasse": payload.get("CodClasse"),
-                "Embedding": embedding
+                "Embedding": np.array(embedding, dtype=np.float32)
             }
         except Exception as e:
             print_error(f"Erro ao recuperar embedding para Id {id}: {e}")

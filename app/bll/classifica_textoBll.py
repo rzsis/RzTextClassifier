@@ -94,7 +94,6 @@ class classifica_textoBll:
                     metodo = "E"                    
                     item_pai = result
                     
-
                 cod_classe = result["CodClasse"]
                 medias_por_classe[cod_classe].append(result["Similaridade"])
                 contagem_por_classe[cod_classe] += 1

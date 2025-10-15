@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import numpy as np
+from sqlalchemy import text
 from tqdm import tqdm
 from sqlalchemy.orm import Session
 from common import print_with_time, print_error, get_localconfig
@@ -36,13 +37,40 @@ class GenerateIdsIguaisCollindgs:
         self.qdrant_client = self.qdrant_utils.get_client()
         self.collection_name = self.qdrant_utils.get_collection_name("final")
         self.classifica_texto = classifica_textoBll(self.embeddings_handler, session)
+        self.baseWhereSQL = """
+                                WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
+                                AND t.CodClasse IS NOT NULL
+                                AND not t.id in (Select id from idsduplicados)
+                                AND not t.id in (Select id from idsiguais)
+                                and t.Indexado = true
+                                and QtdPalavras <= 1024                              
+                            """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
+        self.limiteItensClassificar = self.localconfig.get("text_limit_per_batch")
 
-    def _fetch_data(self) -> list:
+    #faz a consulta no banco de dados para obter os dados a serem processados
+    def _fetch_data(self) -> list:        
+        query = f"""
+            SELECT MIN(t.id) AS Id,
+                   c.CodClasse,
+                   c.Classe,
+                   t.TxtTreinamento AS Text,
+                   COUNT(t.id) AS QtdItens
+            FROM textos_treinamento t
+                    INNER JOIN classes c ON c.CodClasse = t.CodClasse
+                    {self.baseWhereSQL}
+            GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
+            Order by COUNT(t.id) DESC
+            limit {self.limiteItensClassificar}
+        """
+        # Busca dados do banco de dados
         try:
-            data = self.generate_embeddings._fetch_data()  # Call _fetch_data from Embeddings_GenerateBll
-            return data
+            result = self.session.execute(text(query)).mappings().all()
+            dados = [dict(row) for row in result]
+                        
+            return dados
         except Exception as e:
-            raise RuntimeError(f"Erro ao carregar dados do banco: {e}")
+            raise RuntimeError(f"Erro executando consulta no banco de dados: {e}")
+        
 
     def _genetare_ids_colliding(self) -> None:
         """
@@ -51,8 +79,7 @@ class GenerateIdsIguaisCollindgs:
         similarity_threshold_colliding = 0.94
         # Load data from database
         data = self._fetch_data()
-        # Create mapping of Id to data index
-        json_id_to_index = {item["Id"]: idx for idx, item in enumerate(data)}
+        
         # Process similarities
         removed_count = 0
         keep_indices = set(range(len(data)))
@@ -61,21 +88,20 @@ class GenerateIdsIguaisCollindgs:
         for i, item in enumerate(tqdm(data, desc="Buscando Colidentes")):
             if i not in keep_indices:
                 continue
+
             id_tram = item["Id"]
-            # Retrieve query embedding from Qdrant
-            try:
-                points = self.qdrant_client.retrieve(
-                    collection_name=self.collection_name,
-                    ids=[id_tram],
-                    with_vectors=True
-                )
-                if not points:
-                    print_with_time(f"Aviso: Id {id_tram} não encontrado no Qdrant, pulando")
-                    continue
-                query_embedding = np.array(points[0].vector).reshape(1, -1)
-            except Exception as e:
-                print_with_time(f"Erro ao recuperar embedding para Id {id_tram}: {e}")
+            # Retrieve query embedding from Qdrant            
+            result = self.qdrant_utils.get_id(id_tram, self.collection_name) or None
+            if result is None:
+                print_with_time(f"Aviso: Id {id_tram} não encontrado no Qdrant, pulando")
                 continue
+                
+            if result["Embedding"] is None:
+                print_with_time(f"Aviso: Embedding do id: {id_tram} vazio, pulando")
+                continue
+                
+            query_embedding = result["Embedding"] 
+            
             # Perform similarity search using classifica_textoBll
             try:
                 result = self.classifica_texto.search_similarities(
@@ -97,6 +123,7 @@ class GenerateIdsIguaisCollindgs:
                 neighbor_cod_classe = similar_item.CodClasse
                 if neighbor_id == id_tram:
                     continue
+
                 # Mark for removal if similarity exceeds threshold and different class
                 if sim >= similarity_threshold_colliding and item["CodClasse"] != neighbor_cod_classe:
                     neighbor_orig_idx = json_id_to_index.get(neighbor_id)
@@ -144,7 +171,7 @@ class GenerateIdsIguaisCollindgs:
         # Load data from database
         data = self._fetch_data()
         # Create mapping of Id to data index
-        json_id_to_index = {item["Id"]: idx for idx, item in enumerate(data)}
+       
         # Process similarities
         removed_count = 0
         keep_indices = set(range(len(data)))
@@ -155,11 +182,16 @@ class GenerateIdsIguaisCollindgs:
                 continue
             
             id_tram = item["Id"]       
-            reg = qdrant_utils.get_id(id_tram, self.collection_name)
+            reg = self.qdrant_utils.get_id(id_tram, self.collection_name)
             if reg is None:                
+                print_with_time(f"Aviso: Id {id_tram} não encontrado no Qdrant, pulando")
                 continue
             else:
                 query_embedding = reg["Embedding"]
+
+            if query_embedding is None:
+                print_with_time(f"Aviso: Embedding do id: {id_tram} vazio, pulando")
+                continue
             
             # Perform similarity search using classifica_textoBll
             try:

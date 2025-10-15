@@ -9,33 +9,27 @@ class IdsDuplicados:
         self.db = db
         self.logger = logger.log
 
-    def insert_duplicate_ids(self, id: int, texto: str, cod_classe: int):
-        """
-        Inserts duplicate IDs into the idsduplicados table for a given text and CodClasse.
-        
-        Args:
-            id (int): The reference ID to exclude from duplicates.
-            texto (str): The text to check for duplicates (TxtTreinamento).
-            cod_classe (int): The CodClasse associated with the text.
-        """ 
+    # Insere IDs duplicados na tabela idsduplicados
+    def insert_duplicate_ids(self, idBase: int, texto: str, cod_classe: int):
         session = self.db
         try:
             
-            query = """
-                INSERT ignore INTO  idsduplicados (Id, CodClasse)
-                SELECT t.Id, :cod_classe
+            query = f""" 
+                INSERT ignore INTO  idsduplicados (Id, IdDuplicado,CodClasse)
+                SELECT :id_base, t.Id, :cod_classe
                 FROM textos_treinamento t
                 WHERE t.TxtTreinamento = :texto
                 AND t.Id <> :id
                 AND t.Id NOT IN (SELECT Id FROM idsduplicados)
+                and t.CodClasse = :cod_classe
             """
             session.execute(
                 text(query),
-                {"cod_classe": cod_classe, "texto": texto, "id": id}
+                {"id_base":idBase, "cod_classe": cod_classe, "texto": texto, "id": idBase}
             )
             session.commit()            
         except Exception as e:
-            self.logger.error(f"Error inserting duplicate text (ID: {id}): {e}")
-            print_error(f"Error inserting duplicate text (ID: {id}): {e}")
+            self.logger.error(f"Error inserting duplicate text (ID: {idBase}): {e}")
+            print_error(f"Error inserting duplicate text (ID: {idBase}): {e}")
             session.rollback()
         

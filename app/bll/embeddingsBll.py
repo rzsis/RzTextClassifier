@@ -74,7 +74,7 @@ class EmbeddingsBll:
             if norm > 0:
                 embedding = embedding / norm
 
-            return embedding
+            return embedding.flatten()
         except Exception as e:
             raise RuntimeError(f"Erro ao gerar embedding para texto ID = {Id} -> {clean_text} : {e}")
 
@@ -93,8 +93,15 @@ class EmbeddingsBll:
                 attn_implementation="eager"
             ).to("cuda" if torch.cuda.is_available() else "cpu")
 
+            device_load = ""
+            if next(self.model.parameters()).is_cuda:
+               device_load = "✅ Modelo e tokenizer carregados na GPU"
+            else:
+               device_load = "🧠 Modelo e tokenizer carregados na CPU"
+
             self.model.eval()
-            print_with_time(f"Modelo e tokenizer carregados de {model_path} com dimensão {self.model.config.hidden_size}")
+            print_with_time(f"{device_load} de {model_path} com dimensão {self.model.config.hidden_size}")
+            
 
             if self.model.config.hidden_size > 1024:
                 raise RuntimeError(f"Dimensão do embedding maior que 1024 não suportado.")
@@ -102,22 +109,3 @@ class EmbeddingsBll:
 
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")
-
-
-    def search_similar(self, text: str, collection_name: str, k: int = 20) -> List[Dict]:
-        """Busca os k vetores mais similares no Qdrant."""
-        try:
-            query_embedding = self.generate_embedding(text, None)
-            if query_embedding is None:
-                raise RuntimeError("Não foi possível gerar embedding para o texto fornecido.")
-            
-            results = self.qdrant_client.search(
-                collection_name=collection_name,
-                query_vector=query_embedding.tolist(),
-                limit=k,
-                with_payload=True
-            )
-            
-            return [{"payload": r.payload, "score": r.score} for r in results]
-        except Exception as e:
-            raise RuntimeError(f"Erro ao buscar vetores similares no Qdrant: {e}")

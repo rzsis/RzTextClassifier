@@ -201,7 +201,7 @@ class Embeddings_GenerateBll:
                 for exemplo in batch_valid:
                     if exemplo['QtdItens'] > 1:
                         self.ids_duplicados.insert_duplicate_ids(
-                            id=exemplo['Id'],
+                            idBase=exemplo['Id'],
                             texto=exemplo['Text'],
                             cod_classe=exemplo['CodClasse']
                         )

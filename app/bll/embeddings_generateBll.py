@@ -47,11 +47,11 @@ class Embeddings_GenerateBll:
         self.qdrant_utils.create_collection(self.collection_name)           
 
         self.bllEmbeddings = get_bllEmbeddings(session)
-        self.limiteItensClassificar = 5000  
+        self.limiteItensClassificar = localconfig.get("text_limit_per_batch")
         self.baseWhereSQL = """
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
-                                AND not t.id in (Select id from idsduplicados)
+                                AND not t.id in (Select IdDuplicado from idsduplicados)
                                 AND not t.id in (Select id from idsiguais)
                                 and t.Indexado = false
                                 and QtdPalavras <= 1024                              
@@ -97,8 +97,7 @@ class Embeddings_GenerateBll:
         
 
     #faz a consulta no banco de dados para obter os dados a serem processados
-    def _fetch_data(self) -> list:
-        # Define consulta SQL (determinística com MIN(t.id))
+    def _fetch_data(self) -> list:        
         query = f"""
             SELECT MIN(t.id) AS Id,
                    c.CodClasse,
@@ -106,20 +105,18 @@ class Embeddings_GenerateBll:
                    t.TxtTreinamento AS Text,
                    COUNT(t.id) AS QtdItens
             FROM textos_treinamento t
-            INNER JOIN classes c ON c.CodClasse = t.CodClasse
-            {self.baseWhereSQL}
+                    INNER JOIN classes c ON c.CodClasse = t.CodClasse
+                    {self.baseWhereSQL}
             GROUP BY t.TxtTreinamento, t.CodClasse, c.Classe
-            Order by COUNT(t.id),t.id DESC
+            Order by COUNT(t.id) DESC
             limit {self.limiteItensClassificar}
         """
+
         # Busca dados do banco de dados
         try:
             result = self.session.execute(text(query)).mappings().all()
             dados = [dict(row) for row in result]
-
-            if not dados:
-                raise RuntimeError("Não há dados para gerar o modelo de embeddings.")
-            
+                        
             return dados
         except Exception as e:
             raise RuntimeError(f"Erro executando consulta no banco de dados: {e}")
@@ -194,14 +191,14 @@ class Embeddings_GenerateBll:
     
 
     #Processa um lote de dados para gerar embeddings gerar uma lista e inserir no Qdrant
-    def _process_data(self, batch_dados: list) -> tuple[str,int]:
+    def _process_data(self, batch_dados: list,index_lote: int,qtd_lotes:int) -> tuple[str,int]:
         tmpErrors = ""
         print_with_time(f"Memória inicial da GPU: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
         processed_data = []
         skipped = 0
         invalid_reasons = Counter()
 
-        print_with_time(f"Processando lote com {len(batch_dados)} registros ...")
+        print_with_time(f"Processando lote {index_lote} de {qtd_lotes} com {len(batch_dados)} registros ...")
 
         # Processa cada exemplo individualmente
         for exemplo in tqdm(batch_dados, desc="Gerando embeddings individuais"):
@@ -226,7 +223,7 @@ class Embeddings_GenerateBll:
                 # Verifica duplicatas
                 if exemplo['QtdItens'] > 1:
                     self.ids_duplicados.insert_duplicate_ids(
-                        id=exemplo['Id'],
+                        idBase=exemplo['Id'],
                         texto=exemplo['Text'],
                         cod_classe=exemplo['CodClasse']
                     )
@@ -305,23 +302,32 @@ class Embeddings_GenerateBll:
         iniTime = time.time()  
         print_with_time(f"Iniciando processamento de geração de embeddings... : {iniTime}")
         dados = self._fetch_data()
+        qtdreg = len(dados)
+        if qtdreg == 0:
+            return {"status": "Completo",
+                    "message": f"Não há dados para processar, todos dos textos para treinamento já foram indexados."}
+    
         print_with_time(f"Total de registros a processar: {len(dados)}")
         tmpErros = ""
         processados = 0
+        qtdLotes = (qtdreg // self.batch_size) + (1 if qtdreg % self.batch_size > 0 else 0)
 
         # Divide os dados em lotes
-        for i in tqdm(range(0, len(dados), self.batch_size), desc=f"Processando lote"):
+        indexlote = 1
+        for i in tqdm(range(0, qtdreg, self.batch_size), desc=f"Processando lote"):
             batch_dados = dados[i:i + self.batch_size]
-            result = self._process_data(batch_dados)
+            result = self._process_data(batch_dados,indexlote,qtdLotes)
             tmpErros += result[0]
             processados += result[1]
+            indexlote += 1
         
-        elapsed = time.time() - iniTime
-        print_with_time(f"Processamento finalizado. Total processado: {processados}. Duração: {elapsed/60:.2f} min")
+        elapsed     = time.time() - iniTime
+        str_elapsed = f"Duração: {elapsed/60:.2f} min"
+        print_with_time(f"Processamento finalizado. Total processado: {processados}. {str_elapsed}")
 
         if tmpErros != "":
             return {"status": "Processado com erros",
-                    "message": f"Erros {tmpErros} faltam processar {self._get_data_to_process()} registros. processados {processados} registros."}
+                    "message": f"Erros {tmpErros} faltam processar {self._get_data_to_process()} registros. processados {processados} registros, {str_elapsed}"}
         else:
             return {"status": "Sucesso",
-                    "message": f"Faltam processar {self._get_data_to_process()} registros."}
+                    "message": f"Faltam processar {self._get_data_to_process()} registros,  {str_elapsed}"}
