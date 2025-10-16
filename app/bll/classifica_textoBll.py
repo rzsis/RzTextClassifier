@@ -56,11 +56,15 @@ class classifica_textoBll:
 
         return max_sim_item["IdEncontrado"] if max_sim_item else None                 
 
-    def search_similarities(self, query_embedding: np.ndarray, id_a_classificar:Optional[int] = None, 
+    def search_similarities(self, 
+                                query_embedding: np.ndarray, 
+                                id_a_classificar:Optional[int] = None, 
                                 TabelaOrigem:Optional[str] = "", 
                                 itens_limit: int = 20,
-                                gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
-        min_similarity = 0.8
+                                gravar_log = False,
+                                min_similarity:int = 0.8) -> 'classifica_textoBll.ResultadoSimilaridade':
+        
+        
         try:
             results = self.qdrant_utils.search_embedding(query_embedding,
                                                          self.collection_name,

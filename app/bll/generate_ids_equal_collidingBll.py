@@ -83,25 +83,25 @@ class GenerateIdsIguaisCollindgs:
             raise RuntimeError(f"Erro executando consulta no banco de dados: {e}")
         
 
-    def _genetare_ids_colliding(self) -> None:
+    def _genetare_ids_colliding(self) -> str:
         """
         Process a dataset to find colliding items (high similarity, different classes) and save to database.
         """
-        similarity_threshold_colliding = 0.94
+        similarity_threshold_colliding = 0.95
         # Load data from database
         auxFilter = " and BuscouIgual = true and BuscouColidente = false "
         data = self._fetch_data(auxFilter)
         
-        # Process similarities
-        removed_count = 0
-        keep_indices = set(range(len(data)))
-        lista_ids_collidentes = []
+        # Process similarities  
+        ids_Colidentes_Atuais = self.id_colliding_bll.get_all_ids_colidentes()      
+        ids_Bases_Atuais      = self.id_colliding_bll.get_all_ids_base()              
+        ids_collidentes_para_inserir = []
+        ids_verificados = []
         print_with_time(f"Processando {len(data)} registros para colisões...")
-        for i, item in enumerate(tqdm(data, desc="Buscando Colidentes")):
-            if i not in keep_indices:
-                continue
-
+        for  item in tqdm(data, desc="Buscando Colidentes"):          
             id_tram = item["Id"]
+            ids_verificados.append(id_tram)
+
             # Retrieve query embedding from Qdrant            
             result = self.qdrant_utils.get_id(id_tram, self.collection_name) or None
             if result is None:
@@ -114,21 +114,22 @@ class GenerateIdsIguaisCollindgs:
                 
             query_embedding = result["Embedding"] 
             
-            # Perform similarity search using classifica_textoBll
+            # Busca texto similares usando classifica_textoBll
             try:
                 result = self.classifica_texto.search_similarities(
                     query_embedding=query_embedding,
                     id_a_classificar=id_tram,
                     TabelaOrigem="textos_treinamento",
                     itens_limit=self.itens_limit,
-                    gravar_log=False
+                    gravar_log=False,
+                    min_similarity=similarity_threshold_colliding
                 )
                 results = result.ListaSimilaridade or []
             except Exception as e:
                 print_with_time(f"Erro ao buscar similares para Id {id_tram}: {e}")
                 continue
 
-            items_to_remove = set()
+            inseriuIdBase = False
             for similar_item in results:
                 sim = similar_item.Similaridade or 0
                 neighbor_id = similar_item.IdEncontrado
@@ -136,38 +137,50 @@ class GenerateIdsIguaisCollindgs:
                 if neighbor_id == id_tram:
                     continue
 
-                # Mark for removal if similarity exceeds threshold and different class
-                if sim >= similarity_threshold_colliding and item["CodClasse"] != neighbor_cod_classe:                   
-                    # Check if neighbor_id is already in lista_ids_collidentes
-                    already_exists = any(
-                        id_collidente.IdColidente == neighbor_id
-                        for id_collidente in lista_ids_collidentes
-                    )
+                # Adiciona na lista de ids colidentes se a classe for diferente e a similaridade maior que o limiar
+                if item["CodClasse"] != neighbor_cod_classe:                   
+                    # Check if neighbor_id is already in idsColidentesAtuais
+                    already_exists =  (neighbor_id in ids_Colidentes_Atuais) or (id_tram in ids_Colidentes_Atuais)
+
                     if not already_exists:
-                        items_to_remove.add(neighbor_id)
-                        lista_ids_collidentes.append(
+                        inseriuIdBase  = True
+                        ids_Colidentes_Atuais.add(neighbor_id)  # Add to existing to avoid duplicates in this run                                                
+                        ids_collidentes_para_inserir.append(
                             idCollidingModule.IdsColidentes(
                                 Id=id_tram,
                                 IdColidente=neighbor_id,
                                 semelhanca=float((sim or 0) * 100),
                             )
-                        )
-            keep_indices -= items_to_remove
-            removed_count += len(items_to_remove)
+                        )           
+            #fim for insere lista de colidentes
+
+            if inseriuIdBase:
+                ids_Bases_Atuais.add(id_tram)  #Insere o Id da tramitacao somente no final pois ele pode ser colidente de varios outros
+
 
         # Insert idscolidentes into database
         try:
-            itens_inseridos = self.id_colliding_bll.commit_lista(lista_ids_collidentes)
+            itens_inseridos = self.id_colliding_bll.commit_lista(ids_collidentes_para_inserir)            
             if itens_inseridos > 0:
                 print_with_time(f"Inserido no banco em IdsColidentes: {itens_inseridos}")
             else:
                 print_with_time("Nenhum IdsColidentes inserido, lista vazia ou erro na inserção.")
+
         except Exception as e:
             print_error(f"Erro ao inserir IdsColidentes no banco: {e}")
             raise
+
+        try:
+            # Atualiza BuscouColidente para os itens processados para não processa-los novamente
+            self.id_colliding_bll.set_buscou_colidente(ids_verificados)
+        except Exception as e:
+            print_error(f"Erro ao atualizar BuscouColidente: {e}")
+            raise
         
-        print_with_time(f"Registros removidos: {removed_count}")
-        return 
+        result = f"Registros colidentes inseridos: {len(ids_collidentes_para_inserir)}, faltam {self._get_data_to_process(auxFilter)} textos para processar."
+        print_with_time(result)
+
+        return result
 
     #Processa todos os textos contidos em textos_treinamento para encontrar ids com uma similaridade alta e mesma classe
     def _generate_ids_equal(self):
@@ -185,7 +198,6 @@ class GenerateIdsIguaisCollindgs:
                 }
       
         # Process similarities
-        removed_count = 0
         keep_indices = set(range(len(data)))
         lista_ids_iguais = []
         print_with_time(f"Processando {len(data)} registros para itens iguais...")
@@ -244,12 +256,12 @@ class GenerateIdsIguaisCollindgs:
             print_error(f"Erro ao inserir IdsIguais no banco: {e}")
             raise
         
-        # Update BuscouIgual para os itens processados
+        # Atualiza BuscouIgual para os itens processados para não processa-los novamente
         listaIds = (item["Id"] for item in data)
         self.id_iguais_bll.set_buscou_igual(listaIds)
         
 
-        strRetorno = f"Processados {len(data)} textos, faltam {self._get_data_to_process(auxFilter)}, removidos {len(lista_ids_iguais)}."
+        strRetorno = f"Processados {len(data)} textos, faltam {self._get_data_to_process(auxFilter)}, ids iguais encontrados {len(lista_ids_iguais)}."
         print_with_time(strRetorno)
 
         return  {
@@ -271,5 +283,5 @@ class GenerateIdsIguaisCollindgs:
         Start processing the dataset for colliding IDs.
         """
         print_with_time(f"Iniciando processamento de generate_ids_colliding...")
-        self._genetare_ids_colliding()
-        print_with_time("Processamento completo! Execute generate_ids_colliding_start para remover ids colidentes.")
+        return self._genetare_ids_colliding()
+        
