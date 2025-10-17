@@ -36,15 +36,13 @@ fastApi.include_router(textController.router)
 fastApi.include_router(indexController.router)
 fastApi.include_router(embeddings_Generate_Controller.router)
 
-if (common._db.test_connection() is not None):
-    common.print_with_time("Conexão com banco de dados estabelecida com sucesso")
-
+common._db.test_connection()
 
 gpu_utilsModule().print_gpu_info()
 
 if __name__ == "__main__":
     import uvicorn
-    HTTP_PORT = int(localconfig.read_config().get("http_port"))
+    HTTP_PORT = int(localconfig.get("http_port"))
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
     
     uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")

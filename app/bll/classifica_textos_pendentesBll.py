@@ -35,8 +35,7 @@ class ClassificaTextosPendentesBll:
             self.log_dir = "../log"
             self.field = "text"
             self.k = 20  # Number of nearest neighbors to search
-            self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings,
-                            session=session)
+            self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings,session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
             self.gpu_utils = gpu_utilsModule.GpuUtils()     
@@ -62,7 +61,7 @@ class ClassificaTextosPendentesBll:
 
 
 
-    def _fetch_data(self) -> List[RowMapping]:        
+    def _get_data_to_classify(self) -> List[RowMapping]:        
         try:
             query = f"""
                 SELECT t.id,t.TxtTreinamento AS Text                   
@@ -139,9 +138,9 @@ class ClassificaTextosPendentesBll:
         print_with_time(f"Iniciando processamento para classificação de textos a classificar pendentes...")
 
         embeddingsBllModule.initBllEmbeddings(self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
-        
-        # Load data from database
-        data = self._fetch_data()
+                
+        #Obtem dados do banco que falta classificar
+        data = self._get_data_to_classify() 
         
         lista_log_classificacao = []
 
@@ -151,7 +150,7 @@ class ClassificaTextosPendentesBll:
             result = self.classifica_textoBll.classifica_texto( texto,
                                                                 id_a_classificar=id_texto,
                                                                 TabelaOrigem="T",
-                                                                top_k=20)            
+                                                                limite_itens=20)            
             lista_log_classificacao.append({
                 "IdEncontrado": result.IdEncontrado,
                 "IdAClassificar": id_texto,

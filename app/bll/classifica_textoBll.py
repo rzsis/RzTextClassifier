@@ -14,12 +14,12 @@ from sqlalchemy.orm import Session
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 
 class classifica_textoBll:
-    def __init__(self, embeddingsModule: EmbeddingsBll, session: Session):        
+    def __init__(self, embeddingsModule: EmbeddingsBll, session: Session):             
         self.embeddingsModule = embeddingsModule          
         self.log_ClassificacaoBll = log_ClassificacaoBllModule.LogClassificacaoBll(session)
         self.session = session  
-        self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance
-        self.collection_name = self.qdrant_utils.get_collection_name("final")  # Get collection name
+        self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance       
+        self.collection_name = self.qdrant_utils.get_collection_name("final")
         
     # Pydantic model classes
     class ItemSimilar(BaseModel):
@@ -58,16 +58,15 @@ class classifica_textoBll:
 
     def search_similarities(self, 
                                 query_embedding: np.ndarray, 
+                                collection_name: str,
                                 id_a_classificar:Optional[int] = None, 
                                 TabelaOrigem:Optional[str] = "", 
                                 itens_limit: int = 20,
                                 gravar_log = False,
-                                min_similarity:int = 0.8) -> 'classifica_textoBll.ResultadoSimilaridade':
-        
-        
+                                min_similarity:int = 0.8) -> 'classifica_textoBll.ResultadoSimilaridade':                
         try:
             results = self.qdrant_utils.search_embedding(query_embedding,
-                                                         self.collection_name,
+                                                         collection_name,
                                                          itens_limit,
                                                          min_similarity)
                     
@@ -176,22 +175,23 @@ class classifica_textoBll:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
 
     ###   Classifica um texto com base na similaridade com embeddings de referência.        
-    def classifica_texto(self, texto: str, id_a_classificar: Optional[int] = None,
-                        TabelaOrigem:Optional[str] = "",
-                        top_k: int = 20,
-                        gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
+    def classifica_texto(self, 
+                         texto: str, 
+                         id_a_classificar: Optional[int] = None,
+                         TabelaOrigem:Optional[str] = "",
+                         limite_itens: int = 20,
+                         gravar_log = False) -> 'classifica_textoBll.ResultadoSimilaridade':
         
         try:
             # Generate embedding for the input text to compare in future
             query_embedding = self.embeddingsModule.generate_embedding(texto,id_a_classificar)
-            
-           
-            # Perform similarity search
-            return self.search_similarities(query_embedding,
-                                            id_a_classificar , 
-                                            TabelaOrigem, 
-                                            top_k,
-                                            gravar_log)
+                       
+            return self.search_similarities(query_embedding=query_embedding,                                            
+                                            collection_name=self.collection_name,
+                                            id_a_classificar=id_a_classificar , 
+                                            TabelaOrigem=TabelaOrigem, 
+                                            itens_limit=limite_itens,
+                                            gravar_log=gravar_log)
         
         except Exception as e:
             raise RuntimeError(f"Erro ao classificar texto: {e}")

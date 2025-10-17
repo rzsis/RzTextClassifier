@@ -118,6 +118,7 @@ class GenerateIdsIguaisCollindgs:
             try:
                 result = self.classifica_texto.search_similarities(
                     query_embedding=query_embedding,
+                    collection_name=self.collection_name,
                     id_a_classificar=id_tram,
                     TabelaOrigem="textos_treinamento",
                     itens_limit=self.itens_limit,
@@ -220,6 +221,7 @@ class GenerateIdsIguaisCollindgs:
             # Perform similarity search using classifica_textoBll
             try:
                 result = self.classifica_texto.search_similarities(
+                    collection_name=self.collection_name,
                     query_embedding=query_embedding,
                     id_a_classificar=id_tram,
                     TabelaOrigem="textos_treinamento",

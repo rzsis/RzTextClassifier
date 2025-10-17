@@ -78,10 +78,11 @@ class Qdrant_Utils:
             raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
 
     # Busca embeddings similares no qdrant
-    def search_embedding(self, embedding: np.ndarray,
-                        collection_name: str,
-                        limite_itens: int,
-                        similarity_threshold: float) -> list[dict]:
+    def search_embedding(self, 
+                         embedding: np.ndarray,
+                         collection_name: str,
+                         limite_itens: int,
+                         similarity_threshold: float) -> list[dict]:
         try: 
             high_similars = []         
             embedding = np.array(embedding, dtype=float)                                    

@@ -31,7 +31,7 @@ async def ClassificaTexto(texto: str,
         return classifica_textoBll.classifica_texto(texto,
                                                     id_a_classificar,
                                                     TabelaOrigem, 
-                                                    top_k=20, 
+                                                    limite_itens=20, 
                                                     gravar_log=True)
     
     except Exception as e:

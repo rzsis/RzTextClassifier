@@ -1,20 +1,21 @@
 # db_utils.py
+from sys import exception
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import localconfig
 
 class Session:
     def __init__(self,localcfg:localconfig):
-        usuario: str = localcfg.get_db_user() # pyright: ignore[reportAssignmentType]
-        senha: str = localcfg.get_db_password() # type: ignore
-        host: str = localcfg.get_db_server() # type: ignore
-        porta: int = localcfg.get_db_port() # type: ignore
-        banco: str = localcfg.get_db_name()         # type: ignore
+        self.usuario: str = localcfg.get_db_user() # pyright: ignore[reportAssignmentType]
+        self.senha: str = localcfg.get_db_password() # type: ignore
+        self.host: str = localcfg.get_db_server() # type: ignore
+        self.porta: int = localcfg.get_db_port() # type: ignore
+        self.banco: str = localcfg.get_db_name()         # type: ignore
         
 
         self.engine = None
         self._SessionFactory = None        
-        self._connect_database(usuario, senha, host, porta, banco)
+        self._connect_database(self.usuario, self.senha, self.host, self.porta, self.banco)
 
     def _connect_database(self, usuario, senha, host, porta, banco):
         try:
@@ -48,5 +49,12 @@ class Session:
             self.engine = None
 
     def test_connection(self):
-        with self.engine.connect() as conn:
-            return True
+        from common import print_with_time        
+        try:
+            with self.engine.connect() as conn:
+                print_with_time(f"Conexão com banco de dados {self.banco} no host {self.host} estabelecida com sucesso")
+                return True
+        except Exception as e:
+            print_with_time(f"Erro ao conectar com o banco de dados {self.banco} no host {self.host}")
+            return False
+            

@@ -1,3 +1,4 @@
+from ast import Dict, List
 import os
 from pathlib import Path
 from typing_extensions import runtime
@@ -30,8 +31,8 @@ class sugere_textos_classificarBll:
             self.session = session
             self.localconfig = localcfg
             self.config = localcfg.read_config()
-            self.collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
-            self.k = 20
+            self.textos_classificar_collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
+            self.limite_similares = 20
             self.similarity_threshold = 0.95
             self.min_similars = 3
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
@@ -39,26 +40,28 @@ class sugere_textos_classificarBll:
             embeddingsBllModule.initBllEmbeddings(self.session)
             self.qdrant_utils = Qdrant_UtilsModule()
             self.qdrant_client = self.qdrant_utils.get_client()
-            self.qdrant_utils.create_collection(self.collection_name)
+            self.qdrant_utils.create_collection(self.textos_classificar_collection_name)
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
             self.baseWhereSQLClassificar = """
-                                    WHERE Indexado = false
+                                    WHERE 
+                                        Indexado = false
                                     and Classificado = true
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
                                     and t.Metodo in ('N','Q','M')                                    
                                 """
             
             self.baseWhereSQLBuscarSimilar = """
-                                    WHERE Indexado = true
+                                    WHERE 
+                                        Indexado = true
                                     and Classificado = true
-                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''      
-                                    and t.BuscouSimilar = false                
+                                    and t.BuscouSimilar = false                                      
+                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                        
                                     and t.Metodo in ('N','Q','M')                                    
                                 """   
             self.gpu_utils = gpu_utilsModule.GpuUtils()
-            self.limiteItensClassificar = 5000
+            self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
                 
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
@@ -77,8 +80,8 @@ class sugere_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
 
-    #obtem a quantidade de textos pendentes
-    def _get_Textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
+    #Obtem a quantidade de textos pendentes
+    def _get_textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
         try:
             query = f"""
                 SELECT t.id, t.TxtTreinamento AS Text
@@ -91,11 +94,32 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
-    #processa os textos que faltam buscar similares e faz uma pesquisa no qdrant para encontrar textos similares
+    #faz a busca de similares e retorna a lista para inserir na sugestão de classificação        
+    def get_similares(self,id:int) -> list: # type: ignore
+        try:
+            id_found        = self.qdrant_utils.get_id(id=id, collection_name=self.textos_classificar_collection_name)                    
+            if (id_found == None):
+                return None # type: ignore
+                    
+            result          = self.classifica_textoBll.search_similarities(query_embedding= id_found["Embedding"],
+                                                                        collection_name=self.textos_classificar_collection_name,
+                                                                        id_a_classificar= None,
+                                                                        TabelaOrigem="C",
+                                                                        itens_limit=50,
+                                                                        gravar_log=False,
+                                                                        min_similarity=self.similarity_threshold)
+                    
+            return [item.__dict__ for item in result.ListaSimilaridade] # type: ignore
+        except Exception as e:
+            print_with_time(f"erro em get_similares {e} ")
+            
+           
+    #processa os textos que faltam buscar similares e faz uma pesquisa no qdrant 
+    #para encontrar textos similares e inserir na sugestão de classificação
     def processa_textos_falta_buscar_similar(self):
         try:
             print_with_time(f"Iniciando busca de textos similares...")
-            data = self._get_Textos_falta_buscar_similar()
+            data = self._get_textos_falta_buscar_similar()
             if not data:
                 sucessMessage = "Nenhum texto textos similar restante para classifica."
                 print_with_time(sucessMessage)
@@ -108,14 +132,14 @@ class sugere_textos_classificarBll:
             similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
-                    embedding   = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
-                    similars    = self._search_qdrant(embedding, row['id'])
-                    if len(similars) >= self.min_similars:
-                        self._insere_sugestao_textos_classificar(row['id'], similars)                        
-                        similares_inseridos += 1
+                    lista_similares = self.get_similares(id=row['id'])
+
+                    if (lista_similares != None) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
+                        self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
+                        similares_inseridos += len(lista_similares) 
                 
                 except Exception as e:
-                    self.logger.error(f"Erro ao processar texto id {row['id']}: {e}")
+                    self.logger.error(f"Erro ao buscar similar de texto id {row['id']}: {e}")
 
             self._mark_as_buscou_similar(data)                    
             
@@ -138,40 +162,24 @@ class sugere_textos_classificarBll:
         
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
     def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):
-        try:
-            query = f"""
-                select * from sugestao_textos_classificar 
-                where IdBase = :id_texto or IdSimilar = :id_textoSimilar
-            """
-            sugestos_existentes = self.session.execute(
-                    text(query),
-                    {
-                        "id_texto": id_texto,
-                        "id_textoSimilar": id_texto,                        
-                    }
-            ).mappings().all()
-
-             
-            if len(sugestos_existentes) > 0:                
-                return
-            
+        try:               
             for similar in similars:
                 try:
                     query = """
-                        INSERT INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
+                        INSERT ignore INTO  sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
                         VALUES (:id_base, :id_similar, :similaridade, NOW())
                     """
                     self.session.execute(
                         text(query),
                         {
                             "id_base": id_texto,
-                            "id_similar": similar['id'],
-                            "similaridade": (similar['score'] or 0)*100
+                            "id_similar": similar['IdEncontrado'],
+                            "similaridade": (similar['Similaridade'] or 0)*100
                         }
                     )
                     self.session.commit()
                 except Exception as e:
-                    self.logger.error(f"Erro ao inserir sugestao_textos_classificar para id {id_texto}: {e}")
+                    print_with_time(f"Erro ao inserir sugestao_textos_classificar para id {id_texto}: {e}")
                     self.session.rollback()
 
         except Exception as e:
@@ -195,7 +203,7 @@ class sugere_textos_classificarBll:
             self.session.rollback()
 
 
-    #obtem a quantidade de textos pendentes
+    #Obtem a quantidade de textos pendentes a classificar
     def _get_qtd_textos_pendentes_classificar(self) -> int:
         try:
             query = f"""
@@ -208,8 +216,8 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
 
-    #obtem os dados a serem indexados
-    def _fetch_data_to_classify(self) -> Sequence[RowMapping]:
+    #obtem os dados a serem indexados que o sistema não tem na base de treinamento
+    def _fetch_data_not_indexed(self) -> Sequence[RowMapping]:
         try:
             query = f"""
                 SELECT t.id, t.TxtTreinamento AS Text
@@ -222,19 +230,6 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")
 
-    #depois de processado marca como indexado
-    def _mark_as_indexado(self, id_texto: int):
-        try:
-            query = """
-                UPDATE textos_classificar
-                SET indexado = true
-                WHERE id = :id_texto
-            """
-            self.session.execute(text(query), {"id_texto": id_texto})
-            self.session.commit()
-        except Exception as e:
-            self.logger.error(f"Erro ao marcar texto como indexado (id: {id_texto}): {e}")
-            self.session.rollback()
 
     def _mark_lista_as_indexado(self, processados: list[dict]):
         try:
@@ -246,21 +241,20 @@ class sugere_textos_classificarBll:
 
             query = """
                 UPDATE textos_classificar
-                SET indexado = true
+                SET Indexado = true
                 WHERE id IN :ids
             """
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})
-            self.session.commit()
-            self.logger.info(f"Marcados {len(ids_to_update)} textos como indexados em lote.")
+            self.session.commit()            
         except Exception as e:
-            self.logger.error(f"Erro ao marcar textos como indexados em lote: {e}")
+            print_with_time(f"Erro ao marcar textos como indexados em lote: {e}")
             self.session.rollback()
 
     def _insert_texto_qdrant(self, id_texto: int, embedding: np.ndarray):
         try:           
             point = PointStruct(id=id_texto, vector=embedding.flatten().tolist(), payload={"id": id_texto})
             self.qdrant_client.upsert(
-                collection_name=self.collection_name,
+                collection_name=self.textos_classificar_collection_name,
                 points=[point]
             )
         except Exception as e:
@@ -279,7 +273,7 @@ class sugere_textos_classificarBll:
                 ))
             
             result = self.qdrant_client.upsert(
-                collection_name=self.collection_name,
+                collection_name=self.textos_classificar_collection_name,
                 points=points
             )
             
@@ -300,34 +294,14 @@ class sugere_textos_classificarBll:
                 item['UpInsertOk'] = False
             return processed_data
 
-    def _search_qdrant(self, embedding: np.ndarray, id_texto: int) -> list[dict]:
-        try:
-            RuntimeError("Trocar para buscar_embedding de qdrant_utils")
-            search_results = self.qdrant_client.search(
-                collection_name=self.collection_name,
-                query_vector=embedding.flatten().tolist(),
-                limit=self.k,
-                score_threshold=self.similarity_threshold,
-                query_filter=Filter(
-                    must_not=[FieldCondition(key="id", match=MatchValue(value=id_texto))]
-                )
-            )
-            high_similars = [
-                {"id": int(res.payload["id"]), "score": res.score} # pyright: ignore[reportOptionalSubscript]
-                for res in search_results
-                if int(res.payload["id"]) != id_texto # pyright: ignore[reportOptionalSubscript]
-            ]
-            return high_similars
-        except Exception as e:
-            self.logger.error(f"Erro ao buscar similares no Qdrant para id {id_texto}: {e}")
-            return []
 
 
-    #pega todos os textos pendentes que não foram processados no qdrant, gera o embedding e insere no qdrant
+    #pega todos os textos pendentes que o sistema não conseguiu classifcar ou gerou médias ou quantidades
+    #indexa no qdrant para buscar similares e definir uma busca mais precisa pro futuro
     def indexa_e_classifica_textos_classificar(self) -> dict:
         print_with_time(f"Iniciando indexação e detecção de textos similares...")
         self.clusters = {} # Reseta cache
-        data = self._fetch_data_to_classify()
+        data = self._fetch_data_not_indexed()
         if not data:
             sucessMessage = "Nenhum texto pendente para processar."
             print_with_time(sucessMessage)
@@ -351,6 +325,7 @@ class sugere_textos_classificarBll:
                     'Embedding': embedding,
                     'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
                 })
+
             except Exception as e:
                 self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
                                
