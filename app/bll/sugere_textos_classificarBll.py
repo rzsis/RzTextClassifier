@@ -18,6 +18,8 @@ from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
 from collections.abc import Sequence
 import torch
+from bll.indexa_textos_classificarBll import indexa_textos_classificarBll as indexa_textos_classificarBllModule
+import time
 
 class sugere_textos_classificarBll:
     def __init__(self, session: Session):
@@ -44,23 +46,22 @@ class sugere_textos_classificarBll:
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
-            LimitePalavras = localcfg.get("max_length")
-            self.baseWhereSQLClassificar = f"""
-                                    WHERE 
-                                        Indexado = false
-                                    and Classificado = true
-                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
-                                    and t.Metodo in ('N','Q','M') 
-                                    and t.QtdPalavras <= {LimitePalavras}                                   
-                                """
-            
-            self.baseWhereSQLBuscarSimilar = f"""
+            LimitePalavras = localcfg.get("max_length")    
+            self.baseWhereSQLBuscarSimilarCorreto = f"""
                                     WHERE 
                                         Indexado = true
                                     and Classificado = true
                                     and t.BuscouSimilar = false                                      
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                        
                                     and t.Metodo in ('N','Q','M') 
+                                    and t.QtdPalavras <= {LimitePalavras}                                     
+                                """   
+                                         
+            self.baseWhereSQLBuscarSimilar = f"""
+                                    WHERE 
+                                        Indexado = true                                    
+                                    and t.BuscouSimilar = false                                      
+                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                                                            
                                     and t.QtdPalavras <= {LimitePalavras}                                     
                                 """   
             self.gpu_utils = gpu_utilsModule.GpuUtils()
@@ -136,60 +137,6 @@ class sugere_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
 
-    #processa os textos que faltam buscar similares e faz uma pesquisa no qdrant 
-    #para encontrar textos similares e inserir na sugestão de classificação
-    def processa_textos_falta_buscar_similar(self):
-        try:
-            print_with_time(f"Iniciando busca de textos similares...")
-            data = self._get_textos_falta_buscar_similar()
-            sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
-
-            if not data:
-                sucessMessage = "Nenhum texto textos similar restante para classifica."
-                print_with_time(sucessMessage)
-                return {
-                    "status": "OK",
-                    "processados": sucessMessage,
-                    "restante": f"Restam 0 textos pendentes."
-                }
-            
-            similares_inseridos = 0
-            for row in tqdm(data, desc="Processando textos para busca de similares"):
-                try:
-                    lista_similares = self.get_similares(id=row['id'])                    
-                    if (lista_similares != None):
-                        already_exists  = False
-                        for similar in lista_similares:                         
-                            already_exists = (similar['IdEncontrado'] in sugestao_textos_classificar)
-                            if already_exists:
-                                break
-
-                        if (already_exists == False) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
-                            self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
-                            similares_inseridos += len(lista_similares) 
-                
-
-                except Exception as e:
-                    self.logger.error(f"Erro ao buscar similar de texto id {row['id']}: {e}")
-
-            self._mark_as_buscou_similar(data)                    
-            
-            sucessMessage = f"Inseridos {similares_inseridos} sugestões de textos similares."
-            print_with_time(sucessMessage)
-            self.gpu_utils.clear_gpu_cache()
-            return {
-                "status": "OK",
-                "processados": sucessMessage,
-                "restante": f"Restam {self._get_qtd_textos_falta_buscar_similar()} textos pendentes."
-            }
-        except Exception as e:
-            errorMessage = f"Erro ao processar textos para busca de similares: {e}"
-            print_error(errorMessage)
-            return {
-                "status": "ERROR",
-                "processados": errorMessage,
-                "restante": ""
-            }
         
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
     def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):
@@ -247,137 +194,65 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
 
-    #obtem os dados a serem indexados que o sistema não tem na base de treinamento
-    def _fetch_data_not_indexed(self) -> Sequence[RowMapping]:
+    #pega todos os textos pendentes que o sistema não buscou similar procura similares agrupa por similaridade
+    #para depois o usuario sugerir classificações
+    def sugere_textos_para_classificar(self) -> dict:
         try:
-            query = f"""
-                SELECT t.id, t.TxtTreinamento AS Text
-                FROM textos_classificar t
-                {self.baseWhereSQLClassificar}
-                ORDER BY t.id
-                LIMIT {self.limiteItensClassificar}
-            """
-            return self.session.execute(text(query)).mappings().all()
-        except Exception as e:
-            raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")
+            #primeiro deve indexar tudo no qdrant para depois fazer a busca
+            inicio = time.time()
+            indexa_textos_classificarBll = indexa_textos_classificarBllModule(self.session)
+            indexa_textos_classificarBll.indexa_textos_classificar()
 
+            print_with_time(f"Iniciando busca de textos similares...")
+            data = self._get_textos_falta_buscar_similar()
+            sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
 
-    def _mark_lista_as_indexado(self, processados: list[dict]):
-        try:
-            # Filtra apenas os registros com UpInsertOk=True
-            ids_to_update = [item['Id'] for item in processados if item['UpInsertOk']]
-            if not ids_to_update:
-               print_with_time("Nenhum texto para marcar como indexado.")
-               return
-
-            query = """
-                UPDATE textos_classificar
-                SET Indexado = true
-                WHERE id IN :ids
-            """
-            self.session.execute(text(query), {"ids": tuple(ids_to_update)})
-            self.session.commit()            
-        except Exception as e:
-            print_with_time(f"Erro ao marcar textos como indexados em lote: {e}")
-            self.session.rollback()
-
-    def _insert_texto_qdrant(self, id_texto: int, embedding: np.ndarray):
-        try:           
-            point = PointStruct(id=id_texto, vector=embedding.flatten().tolist(), payload={"id": id_texto})
-            self.qdrant_client.upsert(
-                collection_name=self.textos_classificar_collection_name,
-                points=[point]
-            )
-        except Exception as e:
-            self.logger.error(f"Erro ao inserir vetor no Qdrant para id {id_texto}: {e}")
-            raise
-
-    def _insert_lista_texto_qdrant(self, processed_data: list[dict]) -> list[dict]:
-        try:
-            points = []
-            for item in tqdm(processed_data, desc="Inserindo dados no Qdrant"):
-                embedding = item['Embedding']
-                points.append(PointStruct(
-                    id=item['Id'],
-                    vector=embedding.flatten().tolist(),
-                    payload={"id": item['Id']}
-                ))
+            if not data:
+                sucessMessage = "Nenhum texto textos similar restante para classificar"
+                print_with_time(sucessMessage)
+                return {
+                    "status": "OK",
+                    "processados": sucessMessage,
+                    "restante": f"0"
+                }
             
-            result = self.qdrant_client.upsert(
-                collection_name=self.textos_classificar_collection_name,
-                points=points
-            )
-            
-            # Verifica se a operação foi bem-sucedida
-            if result.status == "completed":
-                for item in processed_data:
-                    item['UpInsertOk'] = True
-                self.logger.info(f"Inseridos {len(processed_data)} textos no Qdrant com sucesso.")
-            else:
-                for item in processed_data:
-                    item['UpInsertOk'] = False
-                self.logger.error(f"Falha ao inserir textos no Qdrant: status {result.status}")
-            
-            return processed_data
-        except Exception as e:
-            self.logger.error(f"Erro ao inserir lista de textos no Qdrant: {e}")
-            for item in processed_data:
-                item['UpInsertOk'] = False
-            return processed_data
+            similares_inseridos = 0
+            for row in tqdm(data, desc="Processando textos para busca de similares"):
+                try:
+                    lista_similares = self.get_similares(id=row['id'])                    
+                    if (lista_similares != None):
+                        already_exists  = False
+                        for similar in lista_similares:                         
+                            already_exists = (similar['IdEncontrado'] in sugestao_textos_classificar)
+                            if already_exists:
+                                break
 
+                        if (already_exists == False) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
+                            self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
+                            similares_inseridos += len(lista_similares) 
+                
 
+                except Exception as e:
+                    self.logger.error(f"Erro ao buscar similar de texto id {row['id']}: {e}")
 
-    #pega todos os textos pendentes que o sistema não conseguiu classifcar ou gerou médias ou quantidades
-    #indexa no qdrant para buscar similares e definir uma busca mais precisa pro futuro
-    def indexa_e_classifica_textos_classificar(self) -> dict:
-        print_with_time(f"Iniciando indexação e detecção de textos similares...")
-        self.clusters = {} # Reseta cache
-        data = self._fetch_data_not_indexed()
-        if not data:
-            sucessMessage = "Nenhum texto pendente para processar."
+            self._mark_as_buscou_similar(data)                    
+            self.gpu_utils.clear_gpu_cache()
+
+            tempo_decorrido_min = (time.time() - inicio) / 60          
+            sucessMessage = f"Inseridos {similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
+
             print_with_time(sucessMessage)
             return {
                 "status": "OK",
-                "processados": sucessMessage,
-                "restante": f"Restam 0 textos pendentes."
+                "mensagem": sucessMessage,
+                "restante": f"{self._get_qtd_textos_falta_buscar_similar()}"
             }
-
-        # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
-        processed_data = []
-        for i, row in enumerate(tqdm(data, desc="Gerando embeddings")):
-            try:
-                embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
-                # Clear cache every X batches
-                if i % 20 == 0:
-                     self.gpu_utils.clear_gpu_cache()
-
-                processed_data.append({
-                    'Id': row['id'],
-                    'Embedding': embedding,
-                    'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
-                })
-
-            except Exception as e:
-                self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
-                               
-        self.gpu_utils.clear_gpu_cache()
-
-        # Insere no Qdrant em lotes menores e atualiza UpInsertOk
-        insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
-        for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
-            batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
-            batch_data = self._insert_lista_texto_qdrant(batch_data)
-            # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
-            self._mark_lista_as_indexado(batch_data)
-
-        self.processa_textos_falta_buscar_similar()
-        self.gpu_utils.clear_gpu_cache()
-
-        sucessMessage = f"Processados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes com Qdrant."
-        print_with_time(sucessMessage)
-        return {
-            "status": "OK",
-            "processados": sucessMessage,
-            "restante": f"Restam {self._get_qtd_textos_pendentes_classificar()} textos pendentes."
-        }
+        except Exception as e:
+            errorMessage = f"Erro ao processar textos para busca de similares: {e}"
+            print_error(errorMessage)
+            return {
+                "status": "ERROR",
+                "processados": errorMessage,
+                "restante": ""
+            }
     
