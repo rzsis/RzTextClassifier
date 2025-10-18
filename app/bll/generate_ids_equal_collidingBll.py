@@ -35,7 +35,7 @@ class GenerateIdsIguaisCollindgs:
         self.baseWhereSQL = f"""
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
-                                and not t.id in (Select id from idsduplicados)                                                             
+                                and not t.id in (Select id from idsduplicados)                                
                                 and t.Indexado = true 
                                 and QtdPalavras <= {LimitePalavras}                                                           
                             """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
@@ -188,7 +188,11 @@ class GenerateIdsIguaisCollindgs:
         """
         similarity_threshold_equal = 0.985
         # Load data from database
-        auxFilter = " and BuscouIgual = false and BuscouColidente = false "
+        auxFilter = """ and BuscouIgual = false 
+                        and not t.id in (Select id from idsiguais)
+                        and not t.id in (Select idIgual from idsiguais)
+                    """
+        
         data = self._fetch_data(auxFilter)
         if len(data) == 0:
             return  {
@@ -239,10 +243,18 @@ class GenerateIdsIguaisCollindgs:
                     continue
 
                 # Mark for removal if similarity exceeds threshold and same class
-                if sim >= similarity_threshold_equal and item["CodClasse"] == neighbor_cod_classe:                
-                    lista_ids_iguais.append(
-                        idIguaisModule.IdsIguais(id=id_tram, idIgual=neighbor_id)
-                    )
+                if sim >= similarity_threshold_equal and item["CodClasse"] == neighbor_cod_classe:
+                    already_exist = False
+                    for idgual in lista_ids_iguais:
+                        already_exist = ((idgual.id == id_tram) or (idgual.idIgual == neighbor_id) or 
+                                         (idgual.idIgual == id_tram) or (idgual.id == neighbor_id))
+                        if already_exist:
+                            break
+                    
+                    if not already_exist:
+                        lista_ids_iguais.append(
+                            idIguaisModule.IdsIguais(id=id_tram, idIgual=neighbor_id)
+                        )
           
         # Insert duplicates into database
         try:

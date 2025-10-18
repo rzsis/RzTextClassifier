@@ -45,16 +45,16 @@ class Embeddings_GenerateBll:
         self.qdrant_client      = self.qdrant_utils.get_client()        
         self.collection_name    = self.qdrant_utils.get_collection_name("final")        
         self.qdrant_utils.create_collection(self.collection_name)           
-
         self.bllEmbeddings = get_bllEmbeddings(session)
         self.limiteItensClassificar = localconfig.get("text_limit_per_batch")
-        self.baseWhereSQL = """
+        limitePalavras      =    localconfig.get("max_length")        
+        self.baseWhereSQL   = f"""
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
                                 AND not t.id in (Select IdDuplicado from idsduplicados)                                
                                 and t.Indexado = false
-                                and QtdPalavras <= 1024                              
-                            """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
+                                and QtdPalavras <= {limitePalavras}                              
+                                """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
 
         # Validate model directory
         if not os.path.isdir(self.model_path):            

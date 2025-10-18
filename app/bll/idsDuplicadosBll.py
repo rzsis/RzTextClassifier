@@ -15,7 +15,7 @@ class IdsDuplicados:
         try:
             
             query = f""" 
-                INSERT ignore INTO  idsduplicados (Id, IdDuplicado,CodClasse)
+                INSERT ignore INTO idsduplicados (Id, IdDuplicado,CodClasse)
                 SELECT :id_base, t.Id, :cod_classe
                 FROM textos_treinamento t
                 WHERE t.TxtTreinamento = :texto
@@ -28,8 +28,7 @@ class IdsDuplicados:
                 {"id_base":idBase, "cod_classe": cod_classe, "texto": texto, "id": idBase}
             )
             session.commit()            
-        except Exception as e:
-            self.logger.error(f"Error inserting duplicate text (ID: {idBase}): {e}")
-            print_error(f"Error inserting duplicate text (ID: {idBase}): {e}")
+        except Exception as e:            
+            print_with_time(f"Error inserting duplicate text (ID: {idBase}): {e}")
             session.rollback()
         
