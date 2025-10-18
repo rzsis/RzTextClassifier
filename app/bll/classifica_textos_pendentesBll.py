@@ -39,19 +39,21 @@ class ClassificaTextosPendentesBll:
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
             self.gpu_utils = gpu_utilsModule.GpuUtils()     
-            self.limiteItensClassificar = 5000    
+            self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
+            self.limitePalavras =    localcfg.get("max_length")
 
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar ClassificaTextosPendentesBll: {e}")
         
     def _get_qtd_textos_pendentes(self) -> int:        
         try:
-            query = """
+            query = f"""
                 SELECT Count(t.id) AS TotalTextosPendentes
                 FROM textos_classificar t    
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
                 AND t.TxtTreinamento <> ''
+                and t.QtdPalavras <= {self.limitePalavras}
                 ORDER BY t.id                
             """            
             return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
@@ -68,7 +70,8 @@ class ClassificaTextosPendentesBll:
                 FROM textos_classificar t            
                 WHERE t.Classificado = false
                 and t.TxtTreinamento IS NOT NULL
-                AND t.TxtTreinamento <> ''                
+                AND t.TxtTreinamento <> '' 
+                And t.QtdPalavras <= {self.limitePalavras}               
                 ORDER BY t.id
                 limit {self.limiteItensClassificar}
             """

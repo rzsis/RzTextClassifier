@@ -29,29 +29,22 @@ class IdCollidingBll:
             print_error(f"[ERRO] Falha ao limpar registros de idscolidentes: {e}")
             raise
 
-    #Retorna todos os registros da tabela idscolidentes."""
-    def get_all_ids_colidentes(self):
-       
+    #Retorna todos os registros da tabela idscolidentes.
+    #gerando uma lista dupla pois uma vez inserido o Id colidente como base ou similar ele não deve ser inserido denovo
+    def get_all_ids_colidentes(self):    
         try:
-            result = self.session.execute(text("SELECT IdColidente FROM idscolidentes"))
+            query = """
+                    SELECT IdColidente FROM idscolidentes
+                    Union
+                    SELECT Id FROM idscolidentes 
+                    """
+            result = self.session.execute(text(query))
             rows = result.mappings().all()
             return {row["IdColidente"] for row in rows}        
-            
+                    
         except Exception as e:
             print_error(f"[ERRO] Falha ao buscar registros de idscolidentes: {e}")
             raise
-
-    def get_all_ids_base(self):
-       
-        try:
-            result = self.session.execute(text("SELECT Id FROM idscolidentes"))
-            rows = result.mappings().all()
-            return {row["Id"] for row in rows}        
-            
-        except Exception as e:
-            print_error(f"[ERRO] Falha ao buscar registros de idscolidentes: {e}")
-            raise
-
 
     def set_buscou_colidente(self, id_list):
         """Marca os registros como buscou colidente."""

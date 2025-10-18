@@ -31,14 +31,13 @@ class GenerateIdsIguaisCollindgs:
         self.qdrant_client = self.qdrant_utils.get_client()
         self.collection_name = self.qdrant_utils.get_collection_name("final")
         self.classifica_texto = classifica_textoBll(self.embeddings_handler, session)
-        self.baseWhereSQL = """
+        LimitePalavras = localcfg.get("max_length")        
+        self.baseWhereSQL = f"""
                                 WHERE LENGTH(TRIM(t.TxtTreinamento)) > 0
                                 AND t.CodClasse IS NOT NULL
-                                and not t.id in (Select id from idsduplicados)                                
-                                and not t.id in (Select id from idsiguais)
-                                and not t.id in (Select idIgual from idsiguais)                                
+                                and not t.id in (Select id from idsduplicados)                                                             
                                 and t.Indexado = true 
-                                and QtdPalavras <= 1024                                                           
+                                and QtdPalavras <= {LimitePalavras}                                                           
                             """  # Filtra textos não vazios e não nulos, não duplicados, não iguais e não indexados
         self.limiteItensClassificar = self.localconfig.get("text_limit_per_batch")
 
@@ -93,8 +92,7 @@ class GenerateIdsIguaisCollindgs:
         data = self._fetch_data(auxFilter)
         
         # Process similarities  
-        ids_Colidentes_Atuais = self.id_colliding_bll.get_all_ids_colidentes()      
-        ids_Bases_Atuais      = self.id_colliding_bll.get_all_ids_base()              
+        ids_Colidentes_Atuais = self.id_colliding_bll.get_all_ids_colidentes()                     
         ids_collidentes_para_inserir = []
         ids_verificados = []
         print_with_time(f"Processando {len(data)} registros para colisões...")
@@ -156,7 +154,7 @@ class GenerateIdsIguaisCollindgs:
             #fim for insere lista de colidentes
 
             if inseriuIdBase:
-                ids_Bases_Atuais.add(id_tram)  #Insere o Id da tramitacao somente no final pois ele pode ser colidente de varios outros
+                ids_Colidentes_Atuais.add(id_tram)  #Insere o Id da tramitacao somente no final pois ele pode ser colidente de varios outros
 
 
         # Insert idscolidentes into database

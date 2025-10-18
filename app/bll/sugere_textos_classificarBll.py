@@ -44,21 +44,24 @@ class sugere_textos_classificarBll:
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
-            self.baseWhereSQLClassificar = """
+            LimitePalavras = localcfg.get("max_length")
+            self.baseWhereSQLClassificar = f"""
                                     WHERE 
                                         Indexado = false
                                     and Classificado = true
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
-                                    and t.Metodo in ('N','Q','M')                                    
+                                    and t.Metodo in ('N','Q','M') 
+                                    and t.QtdPalavras <= {LimitePalavras}                                   
                                 """
             
-            self.baseWhereSQLBuscarSimilar = """
+            self.baseWhereSQLBuscarSimilar = f"""
                                     WHERE 
                                         Indexado = true
                                     and Classificado = true
                                     and t.BuscouSimilar = false                                      
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                        
-                                    and t.Metodo in ('N','Q','M')                                    
+                                    and t.Metodo in ('N','Q','M') 
+                                    and t.QtdPalavras <= {LimitePalavras}                                     
                                 """   
             self.gpu_utils = gpu_utilsModule.GpuUtils()
             self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
@@ -113,13 +116,34 @@ class sugere_textos_classificarBll:
         except Exception as e:
             print_with_time(f"erro em get_similares {e} ")
             
-           
+    #obtem uma lista de sugestao_textos_classificar gerando uma lista dupla com IdSimilar e IdBase igual
+    #pois uma vez um IdInserido ele não deve ser considerado similar a outro logo não deve ser inserido novamente
+    def get_list_sugestao_textos_classificar(self): # type: ignore
+        try:
+            query = f"""
+                SELECT t.IdBase as Id
+                FROM sugestao_textos_classificar t
+                Group by t.IdBase                         
+                Union
+                SELECT t.IdSimilar as Id
+                FROM sugestao_textos_classificar t
+                Group by t.IdSimilar                                            
+            """
+            rows = self.session.execute(text(query)).mappings().all()
+            return {row["Id"] for row in rows}
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+        
+
     #processa os textos que faltam buscar similares e faz uma pesquisa no qdrant 
     #para encontrar textos similares e inserir na sugestão de classificação
     def processa_textos_falta_buscar_similar(self):
         try:
             print_with_time(f"Iniciando busca de textos similares...")
             data = self._get_textos_falta_buscar_similar()
+            sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
+
             if not data:
                 sucessMessage = "Nenhum texto textos similar restante para classifica."
                 print_with_time(sucessMessage)
@@ -132,12 +156,19 @@ class sugere_textos_classificarBll:
             similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
-                    lista_similares = self.get_similares(id=row['id'])
+                    lista_similares = self.get_similares(id=row['id'])                    
+                    if (lista_similares != None):
+                        already_exists  = False
+                        for similar in lista_similares:                         
+                            already_exists = (similar['IdEncontrado'] in sugestao_textos_classificar)
+                            if already_exists:
+                                break
 
-                    if (lista_similares != None) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
-                        self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
-                        similares_inseridos += len(lista_similares) 
+                        if (already_exists == False) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
+                            self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
+                            similares_inseridos += len(lista_similares) 
                 
+
                 except Exception as e:
                     self.logger.error(f"Erro ao buscar similar de texto id {row['id']}: {e}")
 
