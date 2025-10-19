@@ -176,7 +176,7 @@ class ClassificaTextosPendentesBll:
         print_with_time(sucessMessage)
         
         sugere_textos_classificarBll = sugere_textos_classificarBLLModule(self.session)                
-        sugere_textos_classificarBll.indexa_e_classifica_textos_classificar()        
+        sugere_textos_classificarBll.sugere_textos_para_classificar()        
     
         return {
             "status": "OK",

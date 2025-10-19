@@ -59,7 +59,7 @@ class sugere_textos_classificarBll:
                                          
             self.baseWhereSQLBuscarSimilar = f"""
                                     WHERE 
-                                        Indexado = true                                    
+                                        t.Indexado = true                                    
                                     and t.BuscouSimilar = false                                      
                                     and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                                                            
                                     and t.QtdPalavras <= {LimitePalavras}                                     
@@ -99,7 +99,7 @@ class sugere_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação        
-    def get_similares(self,id:int) -> list: # type: ignore
+    def get_similares(self,id:int, listaSimilares:list) -> list: # type: ignore
         try:
             id_found        = self.qdrant_utils.get_id(id=id, collection_name=self.textos_classificar_collection_name)                    
             if (id_found == None):
@@ -109,11 +109,13 @@ class sugere_textos_classificarBll:
                                                                         collection_name=self.textos_classificar_collection_name,
                                                                         id_a_classificar= None,
                                                                         TabelaOrigem="C",
-                                                                        itens_limit=50,
+                                                                        itens_limit=400,
                                                                         gravar_log=False,
                                                                         min_similarity=self.similarity_threshold)
-                    
-            return [item.__dict__ for item in result.ListaSimilaridade] # type: ignore
+            if (result == None) or (result.ListaSimilaridade == None):
+                return None # type: ignore
+
+            return [item.__dict__ for item in result.ListaSimilaridade if item.IdEncontrado not in listaSimilares] # type: ignore
         except Exception as e:
             print_with_time(f"erro em get_similares {e} ")
             
@@ -205,7 +207,7 @@ class sugere_textos_classificarBll:
 
             print_with_time(f"Iniciando busca de textos similares...")
             data = self._get_textos_falta_buscar_similar()
-            sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
+            lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
 
             if not data:
                 sucessMessage = "Nenhum texto textos similar restante para classificar"
@@ -219,16 +221,17 @@ class sugere_textos_classificarBll:
             similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
-                    lista_similares = self.get_similares(id=row['id'])                    
-                    if (lista_similares != None):
+                    lista_similares = self.get_similares(id=row['id'],listaSimilares=lista_sugestao_textos_classificar)                    
+                    if (lista_similares != None) and (len(lista_similares) >= self.min_similars):
                         already_exists  = False
                         for similar in lista_similares:                         
-                            already_exists = (similar['IdEncontrado'] in sugestao_textos_classificar)
+                            already_exists = (similar['IdEncontrado'] in lista_sugestao_textos_classificar)
                             if already_exists:
                                 break
 
-                        if (already_exists == False) and len(lista_similares) >= self.min_similars:# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
+                        if (already_exists == False):# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
                             self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
+                            lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()   #atualiza lista para não inserir denovo o mesmo ID                         
                             similares_inseridos += len(lista_similares) 
                 
 
