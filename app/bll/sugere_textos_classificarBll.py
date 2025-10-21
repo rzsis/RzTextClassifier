@@ -81,7 +81,7 @@ class sugere_textos_classificarBll:
             """
             return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+            raise RuntimeError(f"Erro ao obter _get_qtd_textos_falta_buscar_similar: {e}")
         
 
     #Obtem os textos que faltam buscar similares que são duplicados
@@ -99,7 +99,7 @@ class sugere_textos_classificarBll:
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+            raise RuntimeError(f"Erro ao obter _get_lista_textos_duplicados: {e}")
         
     #obtem uma lista que tem todos os textos igual ao texto passado        
     def _get_texto_duplicado(self,id:int, texto:str):
@@ -116,6 +116,7 @@ class sugere_textos_classificarBll:
     #faz e processamento somente dos textos duplicados na base para otimizar o processamento
     def _processa_textos_duplicados(self,data):
         if len(data) == 0:
+            print_with_time("Sem textos duplicados para processar")
             return
         
         qtd_inserido = 0
@@ -143,7 +144,8 @@ class sugere_textos_classificarBll:
     def _get_textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
         try:
             query = f"""
-                SELECT t.id, t.TxtTreinamento AS Text,
+                SELECT t.id, 
+                    t.TxtTreinamento AS Text
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}
                 ORDER BY t.id
@@ -151,7 +153,7 @@ class sugere_textos_classificarBll:
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+            raise RuntimeError(f"Erro ao obter _get_textos_falta_buscar_similar: {e}")
         
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação        
     def get_similares(self,id:int, listaSimilares:list) -> list: # type: ignore
@@ -191,7 +193,7 @@ class sugere_textos_classificarBll:
             return {row["Id"] for row in rows}
 
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+            raise RuntimeError(f"Erro ao obter get_list_sugestao_textos_classificar: {e}")
         
 
         
@@ -245,7 +247,7 @@ class sugere_textos_classificarBll:
             """
             return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+            raise RuntimeError(f"Erro ao obter _get_qtd_textos_pendentes_classificar: {e}")
 
     #pega todos os textos pendentes que o sistema não buscou similar procura similares agrupa por similaridade
     #para depois o usuario sugerir classificações
@@ -285,6 +287,7 @@ class sugere_textos_classificarBll:
                                 break
 
                         if (already_exists == False):# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
+                            melhorar aqui para que lista_sugestao_textos_classificar receba os valores adicionados sem ter que fazer nova query 
                             self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
                             lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()   #atualiza lista para não inserir denovo o mesmo ID                         
                             similares_inseridos += len(lista_similares) 
