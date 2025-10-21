@@ -36,7 +36,7 @@ class sugere_textos_classificarBll:
             self.textos_classificar_collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
             self.limite_similares = 20
             self.similarity_threshold = 0.95
-            self.min_similars = 3
+            self.min_similars = 2
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
             embeddingsBllModule.initBllEmbeddings(self.session)
@@ -84,14 +84,68 @@ class sugere_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
         
 
-    #Obtem a quantidade de textos pendentes
+    #Obtem os textos que faltam buscar similares que são duplicados
+    def _get_lista_textos_duplicados(self) -> Sequence[RowMapping]:
+        try:
+            query = f"""
+                SELECT  t.id, 
+                        t.TxtTreinamento AS Text,
+                        Count(*) as QtdItens
+                FROM textos_classificar t
+                {self.baseWhereSQLBuscarSimilar}    
+                group by t.TxtTreinamento
+                having Count(*) >= 2            
+                ORDER BY Count(*) DESC,t.id              
+            """
+            return self.session.execute(text(query)).mappings().all()
+        except Exception as e:
+            raise RuntimeError(f"Erro ao obter _get_Textos_Pendentes: {e}")
+        
+    #obtem uma lista que tem todos os textos igual ao texto passado        
+    def _get_texto_duplicado(self,id:int, texto:str):
+        query = f"""
+                SELECT  t.id, 
+                        t.TxtTreinamento AS Text                                   
+                FROM textos_classificar t
+                    where  t.id <> {id}
+                           and t.TxtTreinamento = '{texto}'
+        """
+        return self.session.execute(text(query)).mappings().all()
+    
+
+    #faz e processamento somente dos textos duplicados na base para otimizar o processamento
+    def _processa_textos_duplicados(self,data):
+        if len(data) == 0:
+            return
+        
+        lista_marcar_duplicados = []
+        lista_marcar_duplicados.append(data[0]["id"])
+
+        for item in tqdm(data,"Processando textos duplicados"):
+            lista_duplicados = self._get_texto_duplicado(item["id"],item["Text"])
+            lista_insercao_duplicados = []
+            for item_duplicado in lista_duplicados:
+                lista_marcar_duplicados.append(item_duplicado["id"])
+                lista_insercao_duplicados.append({
+                        "IdEncontrado": item_duplicado["id"],
+                        "Similaridade": 1
+                    })
+                
+            self._insere_sugestao_textos_classificar(item["id"],lista_insercao_duplicados)
+        
+        print_with_time(f"Inseridos {len(lista_marcar_duplicados)} textos duplicados")
+
+        self._mark_as_buscou_similar(lista_marcar_duplicados)
+
+
+    #Obtem os textos que faltam buscar similares
     def _get_textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
         try:
             query = f"""
-                SELECT t.id, t.TxtTreinamento AS Text
+                SELECT t.id, t.TxtTreinamento AS Text,
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}
-                ORDER BY t.id                
+                ORDER BY t.id
                 LIMIT {self.limiteItensClassificar}                
             """
             return self.session.execute(text(query)).mappings().all()
@@ -204,6 +258,10 @@ class sugere_textos_classificarBll:
             inicio = time.time()
             indexa_textos_classificarBll = indexa_textos_classificarBllModule(self.session)
             indexa_textos_classificarBll.indexa_textos_classificar()
+
+            print_with_time(f"Iniciando busca de textos duplicados...")
+            data = self._get_lista_textos_duplicados()
+            self._processa_textos_duplicados(data)
 
             print_with_time(f"Iniciando busca de textos similares...")
             data = self._get_textos_falta_buscar_similar()
