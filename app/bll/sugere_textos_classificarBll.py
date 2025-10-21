@@ -94,7 +94,7 @@ class sugere_textos_classificarBll:
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}    
                 group by t.TxtTreinamento
-                having Count(*) >= 2            
+                having Count(*) >= {self.min_similars}            
                 ORDER BY Count(*) DESC,t.id              
             """
             return self.session.execute(text(query)).mappings().all()
@@ -197,8 +197,7 @@ class sugere_textos_classificarBll:
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
     def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):
         try:               
-            for similar in similars:
-                try:
+            for similar in similars:                
                     query = """
                         INSERT ignore INTO  sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
                         VALUES (:id_base, :id_similar, :similaridade, NOW())
@@ -211,10 +210,8 @@ class sugere_textos_classificarBll:
                             "similaridade": (similar['Similaridade'] or 0)*100
                         }
                     )
-                    self.session.commit()
-                except Exception as e:
-                    print_with_time(f"Erro ao inserir sugestao_textos_classificar para id {id_texto}: {e}")
-                    self.session.rollback()
+
+            self.session.commit()
 
         except Exception as e:
                 self.logger.error(f"Erro ao inserir sugestões de textos similares para id {id_texto}: {e}")
