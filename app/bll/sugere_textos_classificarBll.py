@@ -118,26 +118,27 @@ class sugere_textos_classificarBll:
         if len(data) == 0:
             return
         
-        lista_marcar_duplicados = []
-        lista_marcar_duplicados.append(data[0]["id"])
-
+        qtd_inserido = 0
         for item in tqdm(data,"Processando textos duplicados"):
+            lista_marcar_duplicados = []
+            lista_marcar_duplicados.append({"id":item["id"]})            
+
             lista_duplicados = self._get_texto_duplicado(item["id"],item["Text"])
             lista_insercao_duplicados = []
             for item_duplicado in lista_duplicados:
-                lista_marcar_duplicados.append(item_duplicado["id"])
+                lista_marcar_duplicados.append({"id":item_duplicado["id"]})
                 lista_insercao_duplicados.append({
                         "IdEncontrado": item_duplicado["id"],
                         "Similaridade": 1
                     })
+                qtd_inserido += 1
                 
             self._insere_sugestao_textos_classificar(item["id"],lista_insercao_duplicados)
+            self._mark_as_buscou_similar(lista_marcar_duplicados)
         
-        print_with_time(f"Inseridos {len(lista_marcar_duplicados)} textos duplicados")
+        print_with_time(f"Inseridos {qtd_inserido} textos duplicados")
 
-        self._mark_as_buscou_similar(lista_marcar_duplicados)
-
-
+        
     #Obtem os textos que faltam buscar similares
     def _get_textos_falta_buscar_similar(self) -> Sequence[RowMapping]:
         try:
@@ -218,7 +219,7 @@ class sugere_textos_classificarBll:
                 self.session.rollback()
 
     #depois de processado marca como BuscouSimilar a lista que foi processada
-    def _mark_as_buscou_similar(self, data: Sequence[RowMapping]):
+    def _mark_as_buscou_similar(self, data: list):
         try:
             ids_to_update = [row['id'] for row in data]
             query = """
@@ -227,10 +228,9 @@ class sugere_textos_classificarBll:
                 WHERE id IN :ids
             """
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})
-            self.session.commit()
-            self.logger.info(f"Marcados {len(ids_to_update)} textos como buscou similar em lote.")
+            self.session.commit()            
         except Exception as e:
-            self.logger.error(f"Erro ao marcar textos como buscou similar em lote: {e}")
+            print_with_time(f"Erro ao marcar textos como buscou similar em lote: {e}")
             self.session.rollback()
 
 
