@@ -35,8 +35,8 @@ class sugere_textos_classificarBll:
             self.config = localcfg.read_config()
             self.textos_classificar_collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
             self.limite_similares = 20
-            self.similarity_threshold = 0.95
-            self.min_similars = 2
+            self.similarity_threshold = 0.96
+            self.min_similars = 3
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
             embeddingsBllModule.initBllEmbeddings(self.session)
@@ -134,7 +134,7 @@ class sugere_textos_classificarBll:
                     })
                 qtd_inserido += 1
                 
-            self._insere_sugestao_textos_classificar(item["id"],lista_insercao_duplicados)
+            self._insere_sugestao_textos_classificar(item["id"],lista_insercao_duplicados, None)
             self._mark_as_buscou_similar(lista_marcar_duplicados)
         
         print_with_time(f"Inseridos {qtd_inserido} textos duplicados")
@@ -198,13 +198,20 @@ class sugere_textos_classificarBll:
 
         
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
-    def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):
-        try:               
+    def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict],lista_sugestao_textos_classificar: list):
+        try:        
+            if lista_sugestao_textos_classificar != None:
+                        lista_sugestao_textos_classificar.add(id_texto)                   
+
             for similar in similars:                
                     query = """
-                        INSERT ignore INTO  sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
+                        INSERT ignore INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
                         VALUES (:id_base, :id_similar, :similaridade, NOW())
                     """
+
+                    if lista_sugestao_textos_classificar != None:
+                        lista_sugestao_textos_classificar.add(similar['IdEncontrado'])
+                    
                     self.session.execute(
                         text(query),
                         {
@@ -279,6 +286,7 @@ class sugere_textos_classificarBll:
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
                     lista_similares = self.get_similares(id=row['id'],listaSimilares=lista_sugestao_textos_classificar)                    
+                    #caso tiver mais que X amostras de similares insere para sugerir para classificar                     
                     if (lista_similares != None) and (len(lista_similares) >= self.min_similars):
                         already_exists  = False
                         for similar in lista_similares:                         
@@ -286,13 +294,10 @@ class sugere_textos_classificarBll:
                             if already_exists:
                                 break
 
-                        if (already_exists == False):# caso tiver mais que X amostras de similares insere para sugerir para classificar                        
-                            melhorar aqui para que lista_sugestao_textos_classificar receba os valores adicionados sem ter que fazer nova query 
-                            self._insere_sugestao_textos_classificar(row['id'], lista_similares)                        
-                            lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()   #atualiza lista para não inserir denovo o mesmo ID                         
+                        if (already_exists == False):#caso o registro não existir insere
+                            self._insere_sugestao_textos_classificar(row['id'], lista_similares, lista_sugestao_textos_classificar)                                                    
                             similares_inseridos += len(lista_similares) 
                 
-
                 except Exception as e:
                     self.logger.error(f"Erro ao buscar similar de texto id {row['id']}: {e}")
 
