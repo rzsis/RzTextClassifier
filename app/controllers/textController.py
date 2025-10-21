@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 import bll.embeddingsBll as embeddingsBllModule
 from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as classifica_textos_pendentesBllModule
 from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBllModule
+from bll.move_sugestao_treinamentoBLL import move_sugestao_treinamentoBLL as move_sugestao_treinamentoBllModule
 
 router = APIRouter()
    
@@ -57,6 +58,26 @@ async def sugere_textos_classificar(session: Session = Depends(get_session_db)  
         embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         sugere_textos_classificarBll = sugere_textos_classificarBllModule(session)
         return sugere_textos_classificarBll.sugere_textos_para_classificar()
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
+    
+
+#endpoint para sugere textos a classificar
+@router.post("/move_sugestao_treinamento")
+async def move_sugestao_treinamento(idbase:int,
+                                    idsimilar:int,
+                                    codclasse:int,
+                                    tipo_id:str,
+                                    session: Session = Depends(get_session_db)  ):        
+
+    try:             
+        move_sugestao_treinamentoBll = move_sugestao_treinamentoBllModule(session)
+
+        return move_sugestao_treinamentoBll.move_to_treinamento(idBase=idbase,
+                                                                idSimilar=idsimilar,
+                                                                CodClasse=codclasse,
+                                                                tipo_id=tipo_id)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    

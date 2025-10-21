@@ -35,7 +35,7 @@ class Embeddings_GenerateBll:
         self.max_length = self.config["max_length"]
         self.batch_size = 200
         self.textual_fields = {'Text'}
-        self.metadata_fields = {'Classe', 'Id', 'CodClasse', 'QtdItens'}
+        self.metadata_fields = {'Classe', 'Id', 'CodClasse'}
         self.tokenizer = None
         self.model = None
         self.ids_duplicados = IdsDuplicados(session)
@@ -268,8 +268,7 @@ class Embeddings_GenerateBll:
                     payload={
                         "id": item['Metadata']['Id'],
                         "Classe": item['Metadata']['Classe'],
-                        "CodClasse": item['Metadata']['CodClasse'],
-                        "QtdItens": item['Metadata']['QtdItens']
+                        "CodClasse": item['Metadata']['CodClasse']                        
                     }
                 ))
 

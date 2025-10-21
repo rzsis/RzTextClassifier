@@ -1,3 +1,4 @@
+#sugere_textos_classificarBll.py
 from ast import Dict, List
 import os
 from pathlib import Path
@@ -33,7 +34,7 @@ class sugere_textos_classificarBll:
             self.session = session
             self.localconfig = localcfg
             self.config = localcfg.read_config()
-            self.textos_classificar_collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
+            self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train") 
             self.limite_similares = 20
             self.similarity_threshold = 0.96
             self.min_similars = 3

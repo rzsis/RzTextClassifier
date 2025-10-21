@@ -49,11 +49,10 @@ class Qdrant_Utils:
         if (collection_type == "final"):
             return f"v{codcli}_textos_final"
         elif (collection_type == "train"):
-            return f"v{codcli}_textos_train"
+            return f"v{codcli}_textos_classificar"
         else:
             raise RuntimeError(f"get_collection_name só suporta 'final' ou 'train', recebeu: {collection_type}")
     
-
     def dispose(self):
         """Fecha a conexão com o Qdrant."""
         if self._qdrant_client is not None:
@@ -148,9 +147,42 @@ class Qdrant_Utils:
                 "Embedding": np.array(embedding, dtype=np.float32)
             }
         except Exception as e:
-            print_error(f"Erro ao recuperar embedding para Id {id}: {e}")
+            print_with_time(f"Erro ao recuperar embedding para Id {id}: {e}")
             return None
-            
+    
+    def delete_id(self,
+                  collection_name:str,
+                  id:int):
+        try:
+            self._qdrant_client.delete(
+                collection_name=collection_name,
+                points_selector=models.PointIdsList(points=[id])
+            )
+        except Exception as e:
+            print_with_time(f"Erro ao apagar Id {id}: {e}")
+
+    #
+    def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ):
+        try:
+            payload={        
+                    "Id": id,
+                    "Classe": classe,
+                    "CodClasse": codclasse                        
+                    }
+
+            self._qdrant_client.upsert(
+                collection_name=collection_name,
+                points=[
+                    models.PointStruct(
+                        id=id,
+                        vector=embeddings,
+                        payload=payload
+                    )
+                ]
+            )
+        except Exception as e:
+            raise RuntimeError(f"Erro ao inserir ID {id} na coleção {collection_name}: {e}")
+
     # Utilitários de versão
     def _parse_semver(self, v: str) -> tuple[int, int, int]:
         """
