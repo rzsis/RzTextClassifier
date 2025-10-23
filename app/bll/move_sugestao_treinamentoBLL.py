@@ -34,43 +34,45 @@ class move_sugestao_treinamentoBLL:
     #insere um idbase no qdrant na base final apaga da tabela de textos classificar e cadastra na tabela de textos treinamento
     def _move_ids_duplicados(self,list_duplicados,idBase: int, codclasse:int, classe:str):        
         try:
+            #se ele não encontrar o idbase na collection final insere
             if not self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection):
                 registro  = self.qdrant_utils.get_id(id=idBase,collection_name=self.train_collection)
                 if registro is None:
-                   raise RuntimeError(f"Erro em _get_ids_to_move id {idBase} não encontrado na base para classificar")
-                                                   
-                self._move_to_qdrant_final(id,registro["Embedding"],codclasse,classe)        
-                self._move_to_textos_treinamento(idBase,codclasse)
+                   raise RuntimeError(f"Erro em _get_ids_to_move id {idBase} não encontrado na collection {self.train_collection}")
 
+                self._move_to_textos_treinamento(idBase,codclasse)                                                   
+                self._move_to_qdrant_final(idBase,registro["Embedding"],codclasse,classe)        
+                self.session.commit()
         except Exception as e:
-             raise RuntimeError(f"Erro inserindo Id  {idBase} _get_ids_to_move")
+             raise RuntimeError(f"Erro inserindo Id  {idBase} _get_ids_to_move {e}")
      
         for item in list_duplicados:
             self._delete_from_textos_classificar(item)
 
+        self.session.commit()
 
 
-    def _get_ids_to_move(self, idBase: int, idSimilar: int, tipo_id: str,codclasse:int, classe:str) -> list[int]:
-        """Determina os IDs a serem movidos com base no tipo_id."""
+    #Determina os IDs inferiores a min_similarity para mover para treinamento, move e apaga os ids duplicados (igual a 100) para a base de treinamento
+    def _get_ids_to_move(self, idBase: int, idSimilar: int, codclasse:int, classe:str) -> tuple[list[int],int]:        
         ids_to_move = []
-        if tipo_id == "idsimilar":
-            query = f"""
+        lista_duplicados = []        
+        query = f"""
                 SELECT IdSimilar, Similaridade
                 FROM sugestao_textos_classificar
                 WHERE IdBase = :idBase AND Similaridade >= {self.min_similarity}
                 order by IdSimilar
-            """
-            rows         = self.session.execute(text(query), {"idBase": idBase}).mappings().all()
-            ids_to_move  = [row['IdSimilar'] for row in rows if row['Similaridade'] < 100]
-            lista_duplicados     = [row['IdSimilar'] for row in rows if row['Similaridade'] >= 100]
-            
-            # Adiciona idBase se não estiver na collection final só deve inserir um para não ter duplicatas            
-            if lista_duplicados:        
-                    self._move_ids_duplicados(lista_duplicados, idBase, codclasse, classe)          
+         """
+        rows                = self.session.execute(text(query), {"idBase": idBase}).mappings().all()
+        ids_to_move         = [row['IdSimilar'] for row in rows if row['Similaridade'] < 100]
+        lista_duplicados    = [row['IdSimilar'] for row in rows if row['Similaridade'] >= 100]
 
+        # Adiciona idBase se não estiver na collection final só deve inserir um para não ter duplicatas            
+        if lista_duplicados:        
+            self._move_ids_duplicados(lista_duplicados, idBase, codclasse, classe)          
                     
-        return list(set(ids_to_move))
+        return list(set(ids_to_move)),len(lista_duplicados)
 
+    #obtem a classe pelo codclasse
     def _get_classe(self,codclasse) -> str:    
         try:
             query = f"SELECT Classe from classes where codclasse = :codclasse"
@@ -101,30 +103,33 @@ class move_sugestao_treinamentoBLL:
     
     #Move um registro para a tabela textos_treinamento
     def _move_to_textos_treinamento(self, id: int, CodClasse: int) -> None:
-        query_insert = """
-            INSERT INTO ignore textos_treinamento
-            (id, DataEvento, Documento, CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
-            TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, Indexado, BuscouIgual, BuscouColidente)
-            SELECT id, DataEvento, Documento, :CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
-                TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, 1, 0, 0
-            FROM textos_classificar
-            WHERE id = :id
-            ON DUPLICATE KEY UPDATE
-                CodClasse = VALUES(CodClasse),
-                TxtTreinamento = VALUES(TxtTreinamento),
-                TxtDocumento = VALUES(TxtDocumento)
-        """
-        self.session.execute(text(query_insert), {"id": id, "CodClasse": CodClasse})
+        try: 
+            query_insert = """
+                INSERT ignore INTO textos_treinamento
+                (id, DataEvento, Documento, CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
+                TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, Indexado, BuscouIgual, BuscouColidente)
+                SELECT id, DataEvento, Documento, :CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
+                    TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, 1, 0, 0
+                FROM textos_classificar
+                WHERE id = :id
+                ON DUPLICATE KEY UPDATE
+                    CodClasse = VALUES(CodClasse),
+                    TxtTreinamento = VALUES(TxtTreinamento),
+                    TxtDocumento = VALUES(TxtDocumento)
+            """
+            self.session.execute(text(query_insert), {"id": id, "CodClasse": CodClasse})
+            self.session.commit()
+            self._delete_id_sugestao_textos_classificar(id)                    
+        except Exception as e:
+            raise RuntimeError(f"Erro ao mover para textos_treinamento: {e}")
 
-        self._delete_sugestao_textos_classificar(id)        
-
-
+        
     #Remove um registro da tabela textos_classificar
     def _delete_from_textos_classificar(self, id: int) -> None:        
-        query_delete = """
-            DELETE FROM textos_classificar WHERE id = :id
-        """
+        query_delete = " DELETE FROM textos_classificar WHERE id = :id"
         self.session.execute(text(query_delete), {"id": id})
+        self.qdrant_utils.delete_id(collection_name=self.train_collection, id=id)
+        self._delete_id_sugestao_textos_classificar(id)   
 
     #Move ou atualiza um ponto da collection train para a collection final no Qdrant."""
     def _move_to_qdrant_final(self, id: int, embeddings: dict, CodClasse: int, classe:str) -> None:        
@@ -139,9 +144,12 @@ class move_sugestao_treinamentoBLL:
         self.qdrant_utils.delete_id(collection_name=self.train_collection, id=id)
 
     #Remove todos os registros relacionados ao idBase da tabela sugestao_textos_classificar.
-    def _delete_sugestao_textos_classificar(self, id: int) -> None:        
-        query_delete_sug = "DELETE FROM sugestao_textos_classificar WHERE IdSimilar = :id"
-        self.session.execute(text(query_delete_sug), {"id": id})
+    def _delete_id_sugestao_textos_classificar(self, idSimilar: int) -> None:        
+        try:
+            query = "DELETE FROM sugestao_textos_classificar WHERE IdSimilar = :IdSimilar"
+            self.session.execute(text(query), {"IdSimilar": idSimilar})        
+        except Exception as e:
+            raise RuntimeError(f"Erro ao deletar id {idSimilar} sugestao_textos_classificar: {e}")
         
     def move_to_treinamento(self, idBase: int, idSimilar: int, CodClasse: int, tipo_id: str) -> dict:
         try:
@@ -149,19 +157,21 @@ class move_sugestao_treinamentoBLL:
                 raise RuntimeError("tipo_id deve ser 'idbase' ou 'idsimilar'")            
     
             classe = self._get_classe(CodClasse)    
-            ids_to_move = self._get_ids_to_move(idBase, idSimilar, tipo_id,CodClasse,classe)
+            result = self._get_ids_to_move(idBase, idSimilar,CodClasse,classe)
+            ids_to_move = result[0]# lista de ids a mover
+            qtd_movida_igual = result[1] #quantidade de ids iguais 100 que já foram movidos para treinamento
             moved_ids = []
 
-            #move os ids pro qdrant e apaga aqueles que tem similaridade > min_similarity e < 100
+            #move os ids pro qdrant e apaga aqueles que tem similaridade > min_similarity e < 100 sendo que aquilo que é = 100 já foi movido anteriormente
             for id in ids_to_move:
                 # Obtém o ponto da collection train
-                embeddings = self.qdrant_utils.get_id(id=id, collection_name=self.train_collection)
-                if embeddings is None:
+                id_Data = self.qdrant_utils.get_id(id=id, collection_name=self.train_collection)
+                if id_Data is None:
                     print_with_time(f"Aviso: ID {id} não encontrado na collection train, pulando")
                     continue                
         
                 # Move para Qdrant final (insere ou atualiza)
-                self._move_to_qdrant_final(id, embeddings["Embedding"], CodClasse, classe)
+                self._move_to_qdrant_final(id, id_Data["Embedding"], CodClasse, classe)
 
                 # Move para textos_treinamento
                 self._move_to_textos_treinamento(id, CodClasse)
@@ -173,12 +183,13 @@ class move_sugestao_treinamentoBLL:
 
             self.session.commit()
 
-            sucessMessage = f"Movidos {len(moved_ids)} registros para treinamento e Qdrant final"
+            total_movido = len(moved_ids) + qtd_movida_igual
+            sucessMessage = f"Movidos {total_movido} registros para treinamento e Qdrant final"
             print_with_time(sucessMessage)
             return {
                 "status": "OK",
                 "mensagem": sucessMessage,
-                "movidos": moved_ids
+                "movidos": total_movido
             }
 
         except Exception as e:

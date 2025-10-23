@@ -63,7 +63,7 @@ class indexa_textos_classificarBll:
             self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
                 
         except Exception as e:
-            raise RuntimeError(f"Erro ao inicializar sugestao_textos_classificarBll: {e}")
+            raise RuntimeError(f"Erro ao inicializar indexa_textos_classificarBll: {e}")
 
               
     #Obtem a quantidade de textos pendentes a classificar

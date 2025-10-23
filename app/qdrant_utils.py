@@ -4,37 +4,51 @@ from typing import Any, Optional
 import venv
 from aiohttp import Payload
 import numpy as np
+from pymysql import connect
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue
-from sympy import true
+from sympy import false, true
 from common import print_with_time, print_error, get_localconfig
 import re
 import requests
 from importlib.metadata import version as pkg_version
-
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 class Qdrant_Utils:
     def __init__(self):
         from main import localconfig as localcfg
         # Inicializa Qdrant Client
-        self.qdrant_url = localcfg.get("vectordatabasehost")
+        self._qdrant_url = localcfg.get("vectordatabasehost")
         self._qdrant_client = None
         self.collectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
         self._connect_qDrant()
 
     def _connect_qDrant(self) -> bool:
         try:
-            self._qdrant_client = QdrantClient(url=self.qdrant_url, timeout=60)
-            print_with_time(f"QdrantClient inicializado com URL: {self.qdrant_url}")
-
-            # checar compatibilidade client x server
-            self._check_client_server_compatibility()
+            if self.connected():
+                return True
+            
+            self._qdrant_client = QdrantClient(url=self._qdrant_url, timeout=60)
+            print_with_time(f"QdrantClient inicializado com URL: {self._qdrant_url}")
+          
+            self._check_client_server_compatibility()  # checar compatibilidade client x server
 
             return True
         except Exception as e:
             raise RuntimeError(f"[ERRO] Falha ao conectar no qDrant: {e}")
         
+    #verifica se o cliente esta conectado
+    def connected(self) -> bool:        
+        try:
+            health = self._qdrant_client.get_health()
+            # Alguns servidores retornam {'status': 'ok'} ou algo similar
+            if isinstance(health, dict) and health.get("status") == "ok":
+                return True
+            return False
+        except (ConnectionError, UnexpectedResponse, Exception):
+            return False
+            
     #obtem o cliente do qdrant  
     def get_client(self):
         """Cria uma nova sessão (útil para contextos paralelos)."""
@@ -201,7 +215,7 @@ class Qdrant_Utils:
         com fallbacks em /version, headers de /collections e /.
         Retorna "" se não conseguir detectar.
         """
-        base = self.qdrant_url.rstrip("/")
+        base = self._qdrant_url.rstrip("/")
 
         # 1) /telemetry  → espera-se "result.app.version"
         try:
@@ -291,7 +305,7 @@ class Qdrant_Utils:
         # Se não conseguirmos obter a versão do servidor, não bloqueia — apenas informa.
         if not server_ver:
             print_with_time(
-                f"[AVISO] Não foi possível detectar a versão do servidor Qdrant em {self.qdrant_url}. "
+                f"[AVISO] Não foi possível detectar a versão do servidor Qdrant em {self._qdrant_url}. "
                 f"Versão do client: {client_ver}"
             )
             return

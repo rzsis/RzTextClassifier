@@ -33,15 +33,16 @@ class sugere_textos_classificarBll:
             from main import localconfig as localcfg
             self.session = session
             self.localconfig = localcfg
-            self.config = localcfg.read_config()
-            self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train") 
+            self.config = localcfg.read_config()            
             self.limite_similares = 20
             self.similarity_threshold = 0.96
             self.min_similars = 3
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
             embeddingsBllModule.initBllEmbeddings(self.session)
+
             self.qdrant_utils = Qdrant_UtilsModule()
+            self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train")             
             self.qdrant_client = self.qdrant_utils.get_client()
             self.qdrant_utils.create_collection(self.textos_classificar_collection_name)
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
