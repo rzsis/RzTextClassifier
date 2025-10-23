@@ -68,7 +68,6 @@ async def sugere_textos_classificar(session: Session = Depends(get_session_db)  
 async def move_sugestao_treinamento(idbase:int,
                                     idsimilar:int,
                                     codclasse:int,
-                                    tipo_id:str,
                                     session: Session = Depends(get_session_db)  ):        
 
     try:             
@@ -76,8 +75,7 @@ async def move_sugestao_treinamento(idbase:int,
 
         return move_sugestao_treinamentoBll.move_to_treinamento(idBase=idbase,
                                                                 idSimilar=idsimilar,
-                                                                CodClasse=codclasse,
-                                                                tipo_id=tipo_id)
+                                                                CodClasse=codclasse)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
