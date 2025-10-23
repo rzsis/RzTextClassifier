@@ -6,7 +6,6 @@ embendingDatabase/
 app/bll/__pycache__/
 app/bll/__pycache__/embeddings.cpython-311.pyc
 __pycache__/
-app/bll/__pycache__/embeddings.cpython-311.pyc
 embeddingsTrain/
 embeddingsFinal/
 
@@ -17,3 +16,7 @@ __pycache__/
 *.pyd
 
 RzTextClassifier.config
+<<<<<<< HEAD
+=======
+../RzTextClassifier.config
+>>>>>>> 88552a8 (Removido RzTextClassifier.config do git)
