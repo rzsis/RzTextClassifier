@@ -16,3 +16,4 @@ __pycache__/
 *.pyo
 *.pyd
 
+RzTextClassifier.config
