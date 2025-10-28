@@ -186,7 +186,10 @@ class move_sugestao_treinamentoBLL:
                        
             idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)            
             if not idFound:
-                raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento.")
+                idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
+                if not idFound:
+                    raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento.")
+                
             itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,CodClasse)
             if len(itens_colidentes) > 0:
                 return {
