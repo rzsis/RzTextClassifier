@@ -113,15 +113,21 @@ class indexa_textos_classificarBll:
             print_with_time(f"Erro ao marcar textos como indexados em lote: {e}")
             self.session.rollback()
 
-    def _insert_lista_texto_qdrant(self, processed_data: list[dict]) -> list[dict]:
+    def _insert_text_list_qdrant(self, processed_data: list[dict]) -> list[dict]:
         try:
             points = []
             for item in tqdm(processed_data, desc="Inserindo dados no Qdrant"):
+                payload={        
+                    "Id":  item['Id'],
+                    "Classe": item.get('Classe') or None,
+                    "CodClasse": item.get('CodClasse') or None
+                }                
+                
                 embedding = item['Embedding']
                 points.append(PointStruct(
                     id=item['Id'],
                     vector=embedding.flatten().tolist(),
-                    payload={"id": item['Id']}
+                    payload=payload
                 ))
             
             result = self.qdrant_client.upsert(
@@ -186,7 +192,7 @@ class indexa_textos_classificarBll:
         insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
         for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
             batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
-            batch_data = self._insert_lista_texto_qdrant(batch_data)
+            batch_data = self._insert_text_list_qdrant(batch_data)
             # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
             self._mark_lista_as_indexado(batch_data)
         

@@ -164,7 +164,7 @@ class sugere_textos_classificarBll:
             if (id_found == None):
                 return None # type: ignore
                     
-            result          = self.classifica_textoBll.search_similarities(query_embedding= id_found["Embedding"],
+            result          = self.classifica_textoBll.check_embedding_colliding(query_embedding= id_found["Embedding"],
                                                                         collection_name=self.textos_classificar_collection_name,
                                                                         id_a_classificar= None,
                                                                         TabelaOrigem="C",
@@ -200,34 +200,39 @@ class sugere_textos_classificarBll:
 
         
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
-    def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict],lista_sugestao_textos_classificar: list):
-        try:        
-            if lista_sugestao_textos_classificar != None:
-                        lista_sugestao_textos_classificar.add(id_texto)                   
+    def _insere_sugestao_textos_classificar(
+        self, 
+        id_texto: int, 
+        similars: list[dict], 
+        lista_sugestao_textos_classificar: list
+    ):
+        try:
+            if lista_sugestao_textos_classificar is not None:
+                lista_sugestao_textos_classificar.add(id_texto)
 
-            for similar in similars:                
-                    query = """
-                        INSERT ignore INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
-                        VALUES (:id_base, :id_similar, :similaridade, NOW())
-                    """
+            # Monta os valores de forma segura
+            valores = []
+            for similar in similars:
+                id_similar = similar.get('IdEncontrado')
+                similaridade = (similar.get('Similaridade') or 0) * 100
 
-                    if lista_sugestao_textos_classificar != None:
-                        lista_sugestao_textos_classificar.add(similar['IdEncontrado'])
-                    
-                    self.session.execute(
-                        text(query),
-                        {
-                            "id_base": id_texto,
-                            "id_similar": similar['IdEncontrado'],
-                            "similaridade": (similar['Similaridade'] or 0)*100
-                        }
-                    )
+                if lista_sugestao_textos_classificar is not None:
+                    lista_sugestao_textos_classificar.add(id_similar)
 
-            self.session.commit()
+                valores.append(f"({id_texto}, {id_similar}, {similaridade}, NOW())")
+
+            if valores:
+                query = f"""
+                    INSERT IGNORE INTO sugestao_textos_classificar (IdBase, IdSimilar, Similaridade, DataHora)
+                    VALUES {', '.join(valores)}
+                """
+                self.session.execute(text(query))
+                self.session.commit()
 
         except Exception as e:
-                self.logger.error(f"Erro ao inserir sugestões de textos similares para id {id_texto}: {e}")
-                self.session.rollback()
+            self.session.rollback()
+            raise RuntimeError(f"Erro ao inserir sugestao_textos_classificar: {e}")
+
 
     #depois de processado marca como BuscouSimilar a lista que foi processada
     def _mark_as_buscou_similar(self, data: list):
@@ -276,7 +281,7 @@ class sugere_textos_classificarBll:
             lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
 
             if not data:
-                sucessMessage = "Nenhum texto textos similar restante para classificar"
+                sucessMessage = "Nenhum texto similar restante para classificar"
                 print_with_time(sucessMessage)
                 return {
                     "status": "OK",

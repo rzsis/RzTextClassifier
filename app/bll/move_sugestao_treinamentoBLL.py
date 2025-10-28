@@ -8,6 +8,7 @@ from torch import embedding
 from common import print_with_time, print_error
 import logger
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
+from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
 
 class move_sugestao_treinamentoBLL:
     def __init__(self, session: Session):
@@ -28,6 +29,7 @@ class move_sugestao_treinamentoBLL:
             self.qdrant_utils.create_collection(self.final_collection)
             self.logger = logger.log
             self.min_similarity =  98.5
+            self.check_collidingBll = check_collidingBLLModule(session)
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar move_sugestao_treinamentoBLL: {e}")
 
@@ -128,7 +130,7 @@ class move_sugestao_treinamentoBLL:
     def _move_to_textos_treinamento(self, id: int, CodClasse: int) -> None:
         try: 
             query_insert = f"""
-                INSERT ignore INTO textos_treinamento
+                INSERT INTO textos_treinamento
                 (id, DataEvento, Documento, CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
                 TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, Indexado, BuscouIgual, BuscouColidente)
                 SELECT id, DataEvento, Documento, :CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
@@ -180,14 +182,36 @@ class move_sugestao_treinamentoBLL:
     def move_to_treinamento(self, idBase: int, idSimilar: int, CodClasse: int) -> dict:
         try:    
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
-                raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")            
+                raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
+                       
+            idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)            
+            if not idFound:
+                raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento.")
+            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,CodClasse)
+            if len(itens_colidentes) > 0:
+                return {
+                    "status": "ERROR",
+                    "mensagem": f"Foram encontradas colisões de classe para o idBase {idBase} fornecido. Impossível mover para treinamento.",
+                    "itens_colidentes": itens_colidentes
+                }
+
+            idFound = self.qdrant_utils.get_id(id=idSimilar, collection_name=self.train_collection)   
+            if not idFound:
+                raise RuntimeError(f"Erro: O IdSimilar {idSimilar} não foi encontrado na coleção de treinamento.")                                    
+            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idSimilar,CodClasse)
+            if len(itens_colidentes) > 0:
+                return {
+                    "status": "ERROR",
+                    "mensagem": f"Foram encontradas colisões de classe para o idSimilar {idSimilar} fornecido. Impossível mover para treinamento.",
+                    "itens_colidentes": itens_colidentes
+                }
             
-            classe = self._get_classe(CodClasse)    
+
+            classe = self._get_classe(CodClasse)
             result = self._get_ids_to_move(idBase, idSimilar,CodClasse,classe)
             ids_to_move = result[0]# lista de ids a mover
             qtd_movida_igual = result[1] #quantidade de ids iguais 100 que já foram movidos para treinamento
             moved_ids = []
-
 
             #move os ids pro qdrant e apaga aqueles que tem similaridade > min_similarity e < 100 sendo que aquilo que é = 100 já foi movido anteriormente
             for id in ids_to_move:

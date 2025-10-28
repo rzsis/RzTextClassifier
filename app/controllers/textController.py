@@ -14,6 +14,7 @@ import bll.embeddingsBll as embeddingsBllModule
 from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as classifica_textos_pendentesBllModule
 from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBllModule
 from bll.move_sugestao_treinamentoBLL import move_sugestao_treinamentoBLL as move_sugestao_treinamentoBllModule
+from bll.indexa_textos_classificarBll import indexa_textos_classificarBll as indexa_textos_classificarBllModule
 
 router = APIRouter()
    
@@ -62,6 +63,18 @@ async def sugere_textos_classificar(session: Session = Depends(get_session_db)  
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
     
+#endpoint para sugere textos a classificar
+@router.post("/indexa_textos_classificar")
+async def indexa_textos_classificar(session: Session = Depends(get_session_db)  ):        
+
+    try:     
+        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        indexa_textos_classificar = indexa_textos_classificarBllModule(session)
+        return indexa_textos_classificar.indexa_textos_classificar()
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em indexa_textos_classificar : {str(e)}")        
+
 
 #endpoint para sugere textos a classificar
 @router.post("/move_sugestao_treinamento")

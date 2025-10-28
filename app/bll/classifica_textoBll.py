@@ -56,7 +56,7 @@ class classifica_textoBll:
 
         return max_sim_item["IdEncontrado"] if max_sim_item else None                 
 
-    def search_similarities(self, 
+    def check_embedding_colliding(self, 
                                 query_embedding: np.ndarray, 
                                 collection_name: str,
                                 id_a_classificar:Optional[int] = None, 
@@ -186,7 +186,7 @@ class classifica_textoBll:
             # Generate embedding for the input text to compare in future
             query_embedding = self.embeddingsModule.generate_embedding(texto,id_a_classificar)
                        
-            return self.search_similarities(query_embedding=query_embedding,                                            
+            return self.check_embedding_colliding(query_embedding=query_embedding,                                            
                                             collection_name=self.collection_name,
                                             id_a_classificar=id_a_classificar , 
                                             TabelaOrigem=TabelaOrigem, 

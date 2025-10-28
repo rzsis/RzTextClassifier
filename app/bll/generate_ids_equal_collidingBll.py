@@ -1,5 +1,4 @@
 # GenerateIdsIguaisCollindgsBLL.py
-import os
 from pathlib import Path
 import numpy as np
 from sqlalchemy import text
@@ -14,7 +13,6 @@ from bll.classifica_textoBll import classifica_textoBll
 import dbClasses.idIguais as idIguaisModule
 import dbClasses.idsColidentes as idCollidingModule
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
-import qdrant_utils
 
 class GenerateIdsIguaisCollindgs:
     def __init__(self, session: Session, localcfg):
@@ -114,7 +112,7 @@ class GenerateIdsIguaisCollindgs:
             
             # Busca texto similares usando classifica_textoBll
             try:
-                result = self.classifica_texto.search_similarities(
+                result = self.classifica_texto.check_embedding_colliding(
                     query_embedding=query_embedding,
                     collection_name=self.collection_name,
                     id_a_classificar=id_tram,
@@ -222,7 +220,7 @@ class GenerateIdsIguaisCollindgs:
             
             # Perform similarity search using classifica_textoBll
             try:
-                result = self.classifica_texto.search_similarities(
+                result = self.classifica_texto.check_embedding_colliding(
                     collection_name=self.collection_name,
                     query_embedding=query_embedding,
                     id_a_classificar=id_tram,
