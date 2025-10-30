@@ -1,6 +1,7 @@
 #sugere_textos_classificarBll.py
 from ast import Dict, List
 import os
+import math
 from pathlib import Path
 from typing_extensions import runtime
 import numpy as np
@@ -21,6 +22,16 @@ from collections.abc import Sequence
 import torch
 from bll.indexa_textos_classificarBll import indexa_textos_classificarBll as indexa_textos_classificarBllModule
 import time
+
+##################################################
+####################################################
+# Idéia do algoritmo:
+# 1 - Primeiro indexa todos os textos que faltam buscar similares no qdrant na base de treinamento que não foram classificados
+# 2 - Buscar textos que não buscaram similar ainda primeiro encontrando os duplicados que são literalmente iguais e inserir em sugestao_textos_classificar
+# 3 - Processar os textos duplicados primeiro para otimizar o processamento
+# 4 - Buscar os textos que faltam buscar similares utilizando uma curva de similaridade baseada no tamanho do texto e nível de busca
+# 5 - Inserir na tabela sugestao_textos_classificar os textos similares encontrados para sugerir classificação
+####################################################    
 
 class sugere_textos_classificarBll:
     def __init__(self, session: Session):
@@ -48,23 +59,26 @@ class sugere_textos_classificarBll:
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
             self.logger = logger.log
-            LimitePalavras = localcfg.get("max_length")    
+            self.LimitePalavras = localcfg.get("max_length")    
             self.baseWhereSQLBuscarSimilarCorreto = f"""
-                                    WHERE 
-                                        Indexado = true
-                                    and Classificado = true
-                                    and t.BuscouSimilar = false                                      
-                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                        
-                                    and t.Metodo in ('N','Q','M') 
-                                    and t.QtdPalavras <= {LimitePalavras}                                     
+                                    WHERE
+                                        t.Indexado = true
+                                    and t.Classificado = true                                    
+                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''
+                                    and t.Metodo in ('N','Q','M')
+                                    and t.id not in (select IdBase from sugestao_textos_classificar)
+                                    and t.id not in (select IdSimilar from sugestao_textos_classificar)                                    
+                                    and t.QtdPalavras <= {self.LimitePalavras}
                                 """   
                                          
             self.baseWhereSQLBuscarSimilar = f"""
-                                    WHERE 
-                                        t.Indexado = true                                    
-                                    and t.BuscouSimilar = false                                      
-                                    and t.TxtTreinamento IS NOT NULL and t.TxtTreinamento <> ''                                                                                            
-                                    and t.QtdPalavras <= {LimitePalavras}                                     
+                                    WHERE
+                                        t.Indexado = true
+                                    and t.TxtTreinamento is NOT NULL and t.TxtTreinamento <> ''
+                                    and t.id not in (select IdBase from sugestao_textos_classificar)
+                                    and t.id not in (select IdSimilar from sugestao_textos_classificar)
+                                    and t.QtdPalavras <= {self.LimitePalavras}
+                                    and (t.NivelBuscaSimilaridade is null or t.NivelBuscaSimilaridade <= 4)
                                 """   
             self.gpu_utils = gpu_utilsModule.GpuUtils()
             self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
@@ -78,7 +92,7 @@ class sugere_textos_classificarBll:
             query = f"""
                 SELECT Count(t.id) AS TotalTextosPendentes
                 FROM textos_classificar t
-                {self.baseWhereSQLBuscarSimilar}
+                {self.baseWhereSQLBuscarSimilar}                
                 ORDER BY t.id
             """
             return self.session.execute(text(query)).mappings().all()[0]['TotalTextosPendentes']
@@ -95,6 +109,7 @@ class sugere_textos_classificarBll:
                         Count(*) as QtdItens
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}    
+                and t.BuscouSimilar = false
                 group by t.TxtTreinamento
                 having Count(*) >= {self.min_similars}            
                 ORDER BY Count(*) DESC,t.id              
@@ -147,19 +162,52 @@ class sugere_textos_classificarBll:
         try:
             query = f"""
                 SELECT t.id, 
-                    t.TxtTreinamento AS Text
+                    t.TxtTreinamento AS Text,
+                    t.QtdPalavras,
+                    t.NivelBuscaSimilaridade
                 FROM textos_classificar t
-                {self.baseWhereSQLBuscarSimilar}
+                {self.baseWhereSQLBuscarSimilar}                
                 ORDER BY t.id
                 LIMIT {self.limiteItensClassificar}                
             """
             return self.session.execute(text(query)).mappings().all()
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_textos_falta_buscar_similar: {e}")
-        
+    
+    def get_min_similarity(self, qtdPalavras:int, nivelBusca:int) -> float:
+        """
+        Ajusta o nível mínimo de similaridade de acordo com o tamanho do texto
+        e o nível de busca. Usa distância COSINE no Qdrant.
+        """
+        if (nivelBusca == 0):
+            nivelBusca = 1
+
+        p = max(0, float(qtdPalavras))
+        base = 0.98
+        reducao_base = [0.00, 0.04, 0.08, 0.13][nivelBusca - 1]
+
+        # Fator de tamanho (curva suave)
+        queda_curto = 0.30 * (1 - math.tanh(p / 70.0))
+        subida_media = 0.15 * math.tanh((p - 200) / 180.0)
+        ganho_longo = 0.08 * math.tanh((p - 600) / 200.0)
+        fator_tamanho = 0.85 + queda_curto + subida_media + ganho_longo
+
+        reducao = reducao_base * fator_tamanho
+        similaridade = base - reducao
+
+        # Piso: 0.87 apenas no Nível 4
+        piso = 0.87 if nivelBusca == 4 else 0.85
+        return round(max(similaridade, piso), 3)
+                
+
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação        
-    def get_similares(self,id:int, listaSimilares:list) -> list: # type: ignore
+    def get_similares(self,data: dict, listaSimilares:list) -> list: # type: ignore
         try:
+            id              = data['id']  
+            qtdPalavras     = data['QtdPalavras'] or 0
+            nivelBusca      = data['NivelBuscaSimilaridade'] if data['NivelBuscaSimilaridade'] is not None else 0
+            min_similarity  = self.get_min_similarity(qtdPalavras, nivelBusca)
+
             id_found        = self.qdrant_utils.get_id(id=id, collection_name=self.textos_classificar_collection_name)                    
             if (id_found == None):
                 return None # type: ignore
@@ -168,9 +216,9 @@ class sugere_textos_classificarBll:
                                                                         collection_name=self.textos_classificar_collection_name,
                                                                         id_a_classificar= None,
                                                                         TabelaOrigem="C",
-                                                                        itens_limit=400,
+                                                                        itens_limit=100,
                                                                         gravar_log=False,
-                                                                        min_similarity=self.similarity_threshold)
+                                                                        min_similarity=min_similarity)
             if (result == None) or (result.ListaSimilaridade == None):
                 return None # type: ignore
 
@@ -180,7 +228,7 @@ class sugere_textos_classificarBll:
             
     #obtem uma lista de sugestao_textos_classificar gerando uma lista dupla com IdSimilar e IdBase igual
     #pois uma vez um IdInserido ele não deve ser considerado similar a outro logo não deve ser inserido novamente
-    def get_list_sugestao_textos_classificar(self): # type: ignore
+    def _get_list_sugestao_textos_classificar(self): # type: ignore
         try:
             query = f"""
                 SELECT t.IdBase as Id
@@ -240,8 +288,10 @@ class sugere_textos_classificarBll:
             ids_to_update = [row['id'] for row in data]
             query = """
                 UPDATE textos_classificar
-                SET BuscouSimilar = true
-                WHERE id IN :ids
+                SET 
+                    BuscouSimilar = true,
+                    NivelBuscaSimilaridade = COALESCE(NivelBuscaSimilaridade, 0) + 1
+                WHERE id IN :ids;
             """
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})
             self.session.commit()            
@@ -278,7 +328,7 @@ class sugere_textos_classificarBll:
 
             print_with_time(f"Iniciando busca de textos similares...")
             data = self._get_textos_falta_buscar_similar()
-            lista_sugestao_textos_classificar = self.get_list_sugestao_textos_classificar()
+            lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()
 
             if not data:
                 sucessMessage = "Nenhum texto similar restante para classificar"
@@ -292,8 +342,8 @@ class sugere_textos_classificarBll:
             similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
-                    lista_similares = self.get_similares(id=row['id'],listaSimilares=lista_sugestao_textos_classificar)                    
-                    #caso tiver mais que X amostras de similares insere para sugerir para classificar                     
+                    lista_similares = self.get_similares(data=row, listaSimilares=lista_sugestao_textos_classificar)
+                    #caso tiver mais que X amostras de similares insere para sugerir para classificar
                     if (lista_similares != None) and (len(lista_similares) >= self.min_similars):
                         already_exists  = False
                         for similar in lista_similares:                         

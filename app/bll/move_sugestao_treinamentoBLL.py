@@ -80,11 +80,11 @@ class move_sugestao_treinamentoBLL:
         query = f"""
                 SELECT IdSimilar, Similaridade
                 FROM sugestao_textos_classificar
-                WHERE IdBase = :idBase AND Similaridade >= {self.min_similarity}
+                WHERE IdBase = :idBase and Similaridade >= {self.min_similarity}                
                 order by IdSimilar
          """
         rows                = self.session.execute(text(query), {"idBase": idBase}).mappings().all()
-        ids_to_move         = [row['IdSimilar'] for row in rows if row['Similaridade'] < 100]
+        ids_to_move         = [row['IdSimilar'] for row in rows if row['Similaridade'] <  100]
         lista_duplicados    = [row['IdSimilar'] for row in rows if row['Similaridade'] >= 100]
 
         # Adiciona idBase se não estiver na collection final só deve inserir um para não ter duplicatas            
@@ -184,11 +184,12 @@ class move_sugestao_treinamentoBLL:
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
                 raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
                        
+            #Bloco que procura o idBase
             idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)            
             if not idFound:
                 idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
                 if not idFound:
-                    raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento.")
+                    raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento ou na coleção final.")
                 
             itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,CodClasse)
             if len(itens_colidentes) > 0:
@@ -198,9 +199,12 @@ class move_sugestao_treinamentoBLL:
                     "itens_colidentes": itens_colidentes
                 }
 
+            #Bloco que procura o idSimilar
             idFound = self.qdrant_utils.get_id(id=idSimilar, collection_name=self.train_collection)   
             if not idFound:
-                raise RuntimeError(f"Erro: O IdSimilar {idSimilar} não foi encontrado na coleção de treinamento.")                                    
+                idFound = self.qdrant_utils.get_id(id=idSimilar, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
+                if not idFound:
+                    raise RuntimeError(f"Erro: O IdSimilar {idSimilar} não foi encontrado na coleção de treinamento ou na coleção final.")                
             itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idSimilar,CodClasse)
             if len(itens_colidentes) > 0:
                 return {
@@ -209,7 +213,6 @@ class move_sugestao_treinamentoBLL:
                     "itens_colidentes": itens_colidentes
                 }
             
-
             classe = self._get_classe(CodClasse)
             result = self._get_ids_to_move(idBase, idSimilar,CodClasse,classe)
             ids_to_move = result[0]# lista de ids a mover

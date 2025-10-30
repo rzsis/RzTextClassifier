@@ -30,6 +30,7 @@ class check_collidingBLL:
                 # Caso a classe for diferente, é colidência
                 if (codClasse != neighbor_cod_classe):                    # type: ignore                            
                     if not (neighbor_id in ids_Colidentes_Atuais): # type: ignore
+                        similar_item["Similaridade"] = similar_item["Similaridade"] * 100  # type: ignore
                         ids_Colidentes_Atuais.append(similar_item)  # type: ignore                  
                 
             return ids_Colidentes_Atuais # type: ignore
@@ -39,20 +40,20 @@ class check_collidingBLL:
 
     #verfica colidencia baseado em data , data deve vir de qdrant_uitls.get_id esse é o formato esperado
     def check_colliding_by_Embedding(self, query_embedding:  np.array, id_found:int, CodClasse:int) -> dict[str,any]:        
-        # 1️⃣ Verifica se é um ndarray
+        # Verifica se é um ndarray
         if not isinstance(query_embedding, np.ndarray):
             raise TypeError("O parâmetro 'query_embedding' deve ser um numpy.ndarray")
 
-        # 2️⃣ Verifica se não está vazio
+        # Verifica se não está vazio
         if query_embedding.size == 0:
             raise ValueError("O parâmetro 'query_embedding' está vazio")
 
-        # 3️⃣ (opcional) Verifica se é numérico
+        # Verifica se é numérico
         if not np.issubdtype(query_embedding.dtype, np.number):
             raise TypeError("O parâmetro 'query_embedding' deve conter apenas valores numéricos")
                                                  
         try:
-            result = self.qdrant_utils.search_embedding(
+            similarity_list = self.qdrant_utils.search_embedding(
                 embedding=query_embedding,
                 collection_name=self.final_collection,
                 limite_itens=20,
@@ -62,6 +63,6 @@ class check_collidingBLL:
         except Exception as e:
             raise RuntimeError(f"Erro em check_colliding_by_embedding: {e}")
                           
-        return self._get_colliding_items(id_found,CodClasse, result)
+        return self._get_colliding_items(id_found,CodClasse, similarity_list)
 
         
