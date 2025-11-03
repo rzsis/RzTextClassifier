@@ -79,7 +79,7 @@ class sugere_textos_classificarBll:
                                     and t.id not in (select IdBase from sugestao_textos_classificar)
                                     and t.id not in (select IdSimilar from sugestao_textos_classificar)
                                     and t.QtdPalavras <= {self.LimitePalavras}
-                                    and (t.NivelBuscaSimilaridade is null or t.NivelBuscaSimilaridade <= 4)
+                                    and (t.NivelBuscaSimilaridade is null or t.NivelBuscaSimilaridade <= 5)
                                 """   
             self.gpu_utils = gpu_utilsModule.GpuUtils()
             self.limiteItensClassificar = localcfg.get("text_limit_per_batch")
@@ -123,8 +123,7 @@ class sugere_textos_classificarBll:
     #obtem uma lista que tem todos os textos igual ao texto passado        
     def _get_texto_duplicado(self,id:int, texto:str):
         query = f"""
-                SELECT  t.id, 
-                        t.TxtTreinamento AS Text                                   
+                SELECT  t.id                                 
                 FROM textos_classificar t
                     where  t.id <> {id}
                            and t.TxtTreinamento = '{texto}'
@@ -208,28 +207,32 @@ class sugere_textos_classificarBll:
     
     def get_min_similarity(self, qtdPalavras:int, nivelBusca:int) -> float:
         """
-        Ajusta o nível mínimo de similaridade de acordo com o tamanho do texto
-        e o nível de busca. Usa distância COSINE no Qdrant.
+            Calcula o nível mínimo de similaridade (COSINE) aproximando a tabela de 5 níveis fornecida.
+            Usa uma função analítica suave baseada em tanh(), com piso mínimo de 0.90.
         """
-        if (nivelBusca == 0):
-            nivelBusca = 1
 
-        p = max(0, float(qtdPalavras))
-        base = 0.98
-        reducao_base = [0.00, 0.04, 0.08, 0.13][nivelBusca - 1]
-
-        # Fator de tamanho (curva suave)
-        queda_curto = 0.30 * (1 - math.tanh(p / 70.0))
-        subida_media = 0.15 * math.tanh((p - 200) / 180.0)
-        ganho_longo = 0.08 * math.tanh((p - 600) / 200.0)
-        fator_tamanho = 0.85 + queda_curto + subida_media + ganho_longo
-
-        reducao = reducao_base * fator_tamanho
-        similaridade = base - reducao
-
-        # Piso: 0.87 apenas no Nível 4
-        piso = 0.87 if nivelBusca == 4 else 0.85
-        return round(max(similaridade, piso), 3)
+        # Limitar faixa de entrada
+        p = max(0, min(float(qtdPalavras), 1024))
+        nivel = max(1, min(nivelBusca, 5))
+        
+        # Base inicial (nível 1 = 0.98, reduz 0.02 a cada nível)
+        base = 0.98 - (nivel - 1) * 0.02
+        
+        # Ganho máximo conforme o nível
+        # Níveis mais altos têm crescimento um pouco menor
+        max_gain = 0.02 - (nivel - 1) * 0.001
+        
+        # Curva suave: sobe até ~300–500 palavras e estabiliza
+        ganho = max_gain * math.tanh(p / 500)
+        
+        # Similaridade calculada
+        similaridade = base + ganho
+        
+        # Piso mínimo (0.90) e teto lógico (1.0)
+        piso = 0.90
+        teto = 1.0
+        
+        return round(max(min(similaridade, teto), piso), 3)
                 
 
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação
@@ -287,7 +290,7 @@ class sugere_textos_classificarBll:
         similars: list[dict], 
     ):
         try:
-            if self.lista_sugestao_textos_classificar is not None:
+            if (self.lista_sugestao_textos_classificar is not None) and not (id_texto in self.lista_sugestao_textos_classificar):
                 self.lista_sugestao_textos_classificar.add(id_texto)
 
             # Monta os valores de forma segura
@@ -296,7 +299,7 @@ class sugere_textos_classificarBll:
                 id_similar = similar.get('IdEncontrado')
                 similaridade = (similar.get('Similaridade') or 0) * 100
 
-                if self.lista_sugestao_textos_classificar is not None:
+                if (self.lista_sugestao_textos_classificar is not None) and not (id_similar in self.lista_sugestao_textos_classificar):
                     self.lista_sugestao_textos_classificar.add(id_similar)
 
                 valores.append(f"({id_texto}, {id_similar}, {similaridade}, NOW())")
