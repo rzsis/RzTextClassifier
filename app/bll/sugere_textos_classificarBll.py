@@ -103,20 +103,42 @@ class sugere_textos_classificarBll:
         
 
     #Obtem os textos que faltam buscar similares que são duplicados
-    def _get_lista_textos_duplicados(self) -> Sequence[RowMapping]:
+    def _get_lista_textos_duplicados(self) -> list[dict]:
         try:
+            #define o tamanho do group concat para evitar truncamento com     GROUP_CONCAT(t.id ORDER BY t.id) AS TodosIDs em muitos ids duplicados
+            self.session.execute(text("SET SESSION group_concat_max_len = 3000000"))
+        
             query = f"""
                 SELECT  t.id, 
                         t.TxtTreinamento AS Text,
-                        Count(*) as QtdItens
+                        Count(*) as QtdItens,
+                        GROUP_CONCAT(t.id ORDER BY t.id) AS TodosIDs
                 FROM textos_classificar t
                 {self.baseWhereSQLBuscarSimilar}    
                 and t.BuscouIgual = false
-                group by t.TxtTreinamento
-                having Count(*) >= {self.min_similars}            
-                ORDER BY Count(*) DESC,t.id              
+                group by t.TxtTreinamento 
+                Having Count(*) >= {self.min_similars}               
+                ORDER BY Count(*) DESC,t.id           
             """
-            return self.session.execute(text(query)).mappings().all()
+            rows = self.session.execute(text(query)).mappings().all()
+
+            if not rows:
+                return []
+
+            grupos = []
+
+            for i, row in tqdm(enumerate(rows), desc="Agrupando textos duplicados"):
+                texto_atual = row['Text']
+                id_atual = row['id']
+                ids_duplicados = [int(x) for x in row['TodosIDs'].split(',')]    
+                grupos.append({
+                        "IdBase": id_atual,
+                        "Text": texto_atual,
+                        "IdsIguais": ids_duplicados
+                })
+
+            return grupos
+
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_lista_textos_duplicados: {e}")
         
@@ -138,54 +160,53 @@ class sugere_textos_classificarBll:
         except Exception as e:
             print_with_time(f"Erro em _get_QtdPalavras: {e}")
             return 0    
-        
 
-    #faz e processamento somente dos textos duplicados na base para otimizar o processamento
+    #processa os textos duplicados encontrados inserindo na sugestao_textos_classificar 
     def _processa_textos_duplicados(self,data):
         try:
             if len(data) == 0:
                 print_with_time("Sem textos duplicados para processar")
                 return
-            
+                           
             qtd_inserido_similares = 0
             qtd_inserido = 0
             for item in tqdm(data,"Processando textos duplicados"):
-                already_exists = (item['id'] in self.lista_sugestao_textos_classificar)
+                already_exists = (item['IdBase'] in self.lista_sugestao_textos_classificar)
                 if already_exists:
                     continue
                                     
                 lista_marcar_duplicados = []
-                lista_marcar_duplicados.append({"id":item["id"]})            
-
-                lista_duplicados = self._get_texto_duplicado(item["id"],item["Text"])
+                lista_marcar_duplicados.append({"id":item["IdBase"]})            
+                
                 lista_insercao_duplicados = []
-                for item_duplicado in lista_duplicados:
-                    lista_marcar_duplicados.append({"id":item_duplicado["id"]})
+                for item_duplicado in item["IdsIguais"]:
+                    lista_marcar_duplicados.append({"id":item_duplicado})
                     lista_insercao_duplicados.append({
-                            "IdEncontrado": item_duplicado["id"],
+                            "IdEncontrado": item_duplicado,
                             "Similaridade": 1
                         })
                     qtd_inserido += 1
                     
-                self._insere_sugestao_textos_classificar(item["id"],lista_insercao_duplicados)
+                self._insere_sugestao_textos_classificar(item["IdBase"],lista_insercao_duplicados)
                 self._mark_as_buscou_igual(lista_marcar_duplicados)
                 
                 #Agora vai criar um dado para buscar textos altamente similares para o texto base
                 txtToFindSimilar = {  
-                    'id': item["id"],
+                    'id': item["IdBase"],
                     'QtdPalavras': self._get_QtdPalavras(item["Text"]),
                     'NivelBuscaSimilaridade': 0
                 }    
 
                 #agora vai procurar textos altamente similares para sugerir classificação
                 lista_similares = self.get_similares(data=txtToFindSimilar,min_similarity=self.get_min_similarity(txtToFindSimilar['QtdPalavras'],1))
-                self.insere_similares(item["id"], lista_similares,1)
+                self._insere_similares(item["IdBase"], lista_similares,1)
                 if lista_similares != None:
                     qtd_inserido_similares += len(lista_similares)
 
             print_with_time(f"Inseridos {qtd_inserido} textos duplicados + altamente similares {qtd_inserido_similares}")
         except Exception as e:
             print_with_time(f"Erro ao processar em _processa_textos_duplicados: {e}")
+
 
         
     #Obtem os textos que faltam buscar similares
@@ -205,12 +226,56 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_textos_falta_buscar_similar: {e}")
     
+        """   Curva de similaridade mínima baseada em quantidade de palavras e nível de busca
+          Palavras |     N1     N2     N3     N4     N5
+        --------     |--------------------------------------
+             0  |  0.980  0.960  0.940  0.920  0.900
+            25  |  0.980  0.960  0.940  0.920  0.900
+            50  |  0.981  0.961  0.941  0.921  0.901
+            75  |  0.982  0.962  0.942  0.922  0.901
+            100 |  0.983  0.962  0.942  0.922  0.902
+            125 |  0.984  0.963  0.943  0.923  0.902
+            150 |  0.985  0.964  0.944  0.923  0.903
+            175 |  0.986  0.965  0.945  0.924  0.903
+            200 |  0.987  0.966  0.946  0.925  0.904
+            225 |  0.987  0.966  0.946  0.925  0.904
+            250 |  0.988  0.967  0.947  0.926  0.905
+            275 |  0.988  0.968  0.947  0.926  0.905
+            300 |  0.989  0.968  0.948  0.927  0.906
+            325 |  0.989  0.969  0.948  0.927  0.906
+            350 |  0.990  0.969  0.949  0.928  0.906
+            375 |  0.990  0.970  0.949  0.928  0.907
+            400 |  0.990  0.970  0.950  0.928  0.907
+            425 |  0.991  0.971  0.950  0.929  0.907
+            450 |  0.991  0.971  0.951  0.929  0.908
+            475 |  0.991  0.971  0.951  0.929  0.908
+            500 |  0.992  0.972  0.951  0.930  0.908
+            525 |  0.992  0.972  0.952  0.930  0.908
+            550 |  0.992  0.972  0.952  0.930  0.909
+            575 |  0.992  0.973  0.952  0.930  0.909
+            600 |  0.993  0.973  0.953  0.931  0.909
+            625 |  0.993  0.973  0.953  0.931  0.909
+            650 |  0.993  0.974  0.953  0.931  0.909
+            675 |  0.993  0.974  0.953  0.931  0.910
+            700 |  0.993  0.974  0.954  0.932  0.910
+            725 |  0.993  0.974  0.954  0.932  0.910
+            750 |  0.994  0.974  0.954  0.932  0.910
+            775 |  0.994  0.975  0.954  0.932  0.910
+            800 |  0.994  0.975  0.954  0.932  0.910
+            825 |  0.994  0.975  0.955  0.932  0.910
+            850 |  0.994  0.975  0.955  0.933  0.911
+            875 |  0.994  0.975  0.955  0.933  0.911
+            900 |  0.994  0.975  0.955  0.933  0.911
+            925 |  0.994  0.975  0.955  0.933  0.911
+            950 |  0.994  0.976  0.955  0.933  0.911
+            975 |  0.994  0.976  0.955  0.933  0.911
+            1000 |  0.995  0.976  0.956  0.933  0.911
+            1024 |  0.995  0.976  0.956  0.933  0.911 
+    """
+        
+    # Calcula o nível mínimo de similaridade (COSINE) aproximando a tabela de 5 níveis fornecida.    
+    #Usa uma função analítica suave baseada em tanh(), com piso mínimo de 0.90.        
     def get_min_similarity(self, qtdPalavras:int, nivelBusca:int) -> float:
-        """
-            Calcula o nível mínimo de similaridade (COSINE) aproximando a tabela de 5 níveis fornecida.
-            Usa uma função analítica suave baseada em tanh(), com piso mínimo de 0.90.
-        """
-
         # Limitar faixa de entrada
         p = max(0, min(float(qtdPalavras), 1024))
         nivel = max(1, min(nivelBusca, 5))
@@ -283,12 +348,61 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter get_list_sugestao_textos_classificar: {e}")
                 
+    def _insere_sugestao_textos_classificar_duplicados(self, id_texto: int, similars: list[dict]) -> None:
+            """
+            Insere sugestões de textos similares na tabela `sugestao_textos_classificar`.
+            Um INSERT por chamada (por grupo), com COMMIT imediato.
+            
+            Args:
+                id_texto (int): IdBase
+                similars (list[dict]): [{'IdEncontrado': int, 'Similaridade': float}, ...]
+            """
+            if not similars:
+                return
+
+            try:
+                if self.lista_sugestao_textos_classificar is not None:
+                    self.lista_sugestao_textos_classificar.add(id_texto)
+
+                params = []
+                values = []
+
+                for idx, sim in enumerate(similars):
+                    id_similar = sim['IdEncontrado']
+                    similaridade = int((sim.get('Similaridade') or 0.0) * 100)  # 0-100
+
+                    # Atualiza cache
+                    if (self.lista_sugestao_textos_classificar is not None and id_similar not in self.lista_sugestao_textos_classificar):
+                        self.lista_sugestao_textos_classificar.add(id_similar)
+
+                    # Bind parameters
+                    params.append({
+                        f'id_base_{idx}': id_texto,
+                        f'id_similar_{idx}': id_similar,
+                        f'similaridade_{idx}': similaridade
+                    })
+                    values.append(f"(:id_base_{idx}, :id_similar_{idx}, :similaridade_{idx}, NOW())")
+
+                query = f"""
+                    INSERT IGNORE INTO sugestao_textos_classificar 
+                        (IdBase, IdSimilar, Similaridade, DataHora)
+                    VALUES {', '.join(values)}
+                """
+
+                # Junta todos os params em um único dict
+                flat_params = {}
+                for p in params:
+                    flat_params.update(p)
+
+                self.session.execute(text(query), flat_params)
+                self.session.commit()
+
+            except Exception as e:
+                self.session.rollback()
+                raise RuntimeError(f"Erro ao inserir sugestões para IdBase {id_texto}: {e}")
+
     #insere as sugestões de textos similares na tabela sugestao_textos_classificar
-    def _insere_sugestao_textos_classificar(
-        self, 
-        id_texto: int, 
-        similars: list[dict], 
-    ):
+    def _insere_sugestao_textos_classificar(self, id_texto: int, similars: list[dict]):        
         try:
             if (self.lista_sugestao_textos_classificar is not None) and not (id_texto in self.lista_sugestao_textos_classificar):
                 self.lista_sugestao_textos_classificar.add(id_texto)
@@ -364,7 +478,7 @@ class sugere_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter _get_qtd_textos_pendentes_classificar: {e}")
 
     #insere os similares encontrados caso tenha mais que o mínimo definido
-    def insere_similares(self, id_texto:int, lista_similares:list, min_similars:int):
+    def _insere_similares(self, id_texto:int, lista_similares:list, min_similars:int):
         #caso tiver mais que X amostras de similares insere para sugerir para classificar    
         try:
             if (lista_similares != None) and (len(lista_similares) >= min_similars):
@@ -376,7 +490,7 @@ class sugere_textos_classificarBll:
 
                     if (already_exists == False):#caso o registro não existir insere
                         self._insere_sugestao_textos_classificar(id_texto, lista_similares)                                                    
-                        self.similares_inseridos += 1
+                        self.similares_inseridos += len(lista_similares)
 
         except Exception as e:
            print_with_time(f"Erro ao inserir similares para texto id {id_texto}: {e}")   
@@ -412,7 +526,7 @@ class sugere_textos_classificarBll:
             for row in tqdm(data, desc="Processando textos para busca de similares"):
                 try:
                     lista_similares = self.get_similares(data=row)
-                    self.insere_similares(row['id'], lista_similares, self.min_similars)
+                    self._insere_similares(row['id'], lista_similares, self.min_similars)
                 
                 except Exception as e:
                     print_with_time(f"Erro ao buscar similar de texto id {row['id']}: {e}")
