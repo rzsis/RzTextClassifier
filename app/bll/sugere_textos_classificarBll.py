@@ -127,7 +127,7 @@ class sugere_textos_classificarBll:
 
             grupos = []
 
-            for i, row in tqdm(enumerate(rows), desc="Agrupando textos duplicados"):
+            for row in rows:
                 texto_atual = row['Text']
                 id_atual = row['id']
                 ids_duplicados = [int(x) for x in row['TodosIDs'].split(',')]    

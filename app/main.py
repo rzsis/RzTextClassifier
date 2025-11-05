@@ -1,5 +1,7 @@
 # main.py
 import os
+
+from controllers import edit_text_contoller
 #Necessario colocar ja inicio para pegar antes de importar torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
 os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
@@ -8,9 +10,10 @@ os.environ["ATTN_IMPLEMENTATION"] = "eager"  # antes de importar transformers
 
 from operator import index
 from fastapi import FastAPI
-import controllers.textController as textController
-import controllers.indexController as indexController
-import controllers.embeddings_Generate_Controller as embeddings_Generate_Controller
+import controllers.text_controller as text_controller
+import controllers.index_controller as index_controller
+import controllers.embeddings_generate_controller as embeddings_generate_controller
+import controllers.edit_text_contoller as edit_text_contoller
 import localconfig
 import common
 import logger
@@ -32,9 +35,10 @@ fastApi = FastAPI()
 logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers do FastAPI
 
 # 4) Registra os controllers (APIRouter)
-fastApi.include_router(textController.router)
-fastApi.include_router(indexController.router)
-fastApi.include_router(embeddings_Generate_Controller.router)
+fastApi.include_router(text_controller.router)
+fastApi.include_router(index_controller.router)
+fastApi.include_router(embeddings_generate_controller.router)
+fastApi.include_router(edit_text_contoller.router)
 
 common._db.test_connection()
 
