@@ -26,8 +26,15 @@ class edit_textos_treinamentoBLL:
         self.final_collection = self.qdrant_utils.get_collection_name("final")             
         self.qdrant_client = self.qdrant_utils.get_client()
 
-    def _edit_texto_treinamento(self, id: int, codClasse: int):
+    def _edit_texto_treinamento(self, id: int, codClasse: int, idFound: dict[str, any]):
         try:
+            if not self.qdrant_utils.upinsert_id(collection_name=self.final_collection,
+                                          id=id,
+                                          embeddings=idFound["Embedding"],
+                                          codclasse=codClasse,
+                                          classe=idFound["Classe"]):
+                raise RuntimeError(f"Erro ao atualizar o ID {id} na coleção final.")
+                        
             sql = text("""
                 UPDATE textos_treinamento
                 SET cod_classe = :codClasse
@@ -56,7 +63,7 @@ class edit_textos_treinamentoBLL:
                 }
 
 
-        self._edit_texto_treinamento(id, codClasse)
+        self._edit_texto_treinamento(id, codClasse, idFound)
         
         return {
                     "status": "sucesso", 

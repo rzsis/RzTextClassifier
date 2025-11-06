@@ -2,6 +2,7 @@
 from ast import Dict
 from typing import Any, Optional
 import venv
+from xmlrpc.client import boolean
 from aiohttp import Payload
 import numpy as np
 from pymysql import connect
@@ -176,7 +177,7 @@ class Qdrant_Utils:
             print_with_time(f"Erro ao apagar Id {id}: {e}")
 
     #
-    def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ):
+    def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ) -> boolean:
         try:
             payload={        
                     "Id": id,
@@ -194,6 +195,7 @@ class Qdrant_Utils:
                     )
                 ]
             )
+            return True
         except Exception as e:
             raise RuntimeError(f"Erro ao inserir ID {id} na coleção {collection_name}: {e}")
 

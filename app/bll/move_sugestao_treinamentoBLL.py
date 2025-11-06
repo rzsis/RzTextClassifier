@@ -43,15 +43,13 @@ class move_sugestao_treinamentoBLL:
                 regbase = self.qdrant_utils.get_id(id=idBase,collection_name=self.final_collection)#verifica se existe na collection final
                 self._move_to_textos_treinamento(idBase,codclasse)                                                                          
                 self._move_to_qdrant_final(idBase,registro["Embedding"],codclasse,classe)#tem que atualizar no qdrant pois os embeddings podem ter sido recalculados
-
-            self.session.commit()
-        except Exception as e:
-             raise RuntimeError(f"Erro inserindo Id  {idBase} _get_ids_to_move {e}")
+            
      
-        for item in list_duplicados:
-            self._delete_sugestao_textos_classificar(item)
-
-        self.session.commit()
+            for item in list_duplicados:
+                self._delete_sugestao_textos_classificar(item)
+            
+        except Exception as e:
+                raise RuntimeError(f"Erro inserindo Id  {idBase} _get_ids_to_move {e}")        
 
     #Verifica se o idBase já está na coleção final do Qdrant e, se não estiver, move-o para lá."""
     def check_idBase_in_final_collection(self, idBase: int, codclasse:int, classe:str)-> int:
@@ -64,7 +62,6 @@ class move_sugestao_treinamentoBLL:
                 
                 self._move_to_textos_treinamento(idBase, codclasse)  # Move para textos_treinamento
                 self._move_to_qdrant_final(idBase, registro_train["Embedding"], codclasse, classe)  # Move para Qdrant final
-                self.session.commit()
                 return 1#server para dizer que moveu e incrementar a contagem
             else:
                 return 0
@@ -143,7 +140,7 @@ class move_sugestao_treinamentoBLL:
                     TxtDocumento = VALUES(TxtDocumento)
             """
             self.session.execute(text(query_insert), {"id": id, "CodClasse": CodClasse})
-            self.session.commit()
+
             self._delete_sugestao_textos_classificar(id)                    
         except Exception as e:
             raise RuntimeError(f"Erro ao mover para textos_treinamento: {e}")
@@ -179,7 +176,7 @@ class move_sugestao_treinamentoBLL:
         result = self.session.execute(text(query), {"IdBase": idBase, "IdSimilar": idSimilar}).scalar()
         return (result or 0) > 0
 
-    def move_to_treinamento(self, idBase: int, idSimilar: int, CodClasse: int) -> dict:
+    def move_sugestao_treinamento(self, idBase: int, idSimilar: int, CodClasse: int) -> dict:
         try:    
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
                 raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
@@ -189,8 +186,7 @@ class move_sugestao_treinamentoBLL:
             if not idFound:
                 idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
                 if not idFound:
-                    raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento ou na coleção final.")
-                
+                    raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento ou na coleção final.")                
             itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,CodClasse)
             if len(itens_colidentes) > 0:
                 return {
@@ -233,6 +229,7 @@ class move_sugestao_treinamentoBLL:
                 
                 moved_ids.append(id)
 
+            #grava as mudanças no banco de dados idéia é que tudo seja feito numa transação só
             self.session.commit()
 
             total_movido = len(moved_ids) + qtd_movida_igual

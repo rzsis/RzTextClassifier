@@ -86,7 +86,7 @@ async def move_sugestao_treinamento(idbase:int,
     try:             
         move_sugestao_treinamentoBll = move_sugestao_treinamentoBllModule(session)
 
-        return move_sugestao_treinamentoBll.move_to_treinamento(idBase=idbase,
+        return move_sugestao_treinamentoBll.move_sugestao_treinamento(idBase=idbase,
                                                                 idSimilar=idsimilar,
                                                                 CodClasse=codclasse)
         
