@@ -23,7 +23,7 @@ class check_collidingBLL:
             ids_Colidentes_Atuais = []
             for similar_item in lista_similares:            
                 neighbor_id         = similar_item["IdEncontrado"]
-                neighbor_cod_classe = similar_item["CodClasse"]
+                neighbor_cod_classe = similar_item["CodClasse"]                
                 if neighbor_id == idBase:
                     continue
 

@@ -1,4 +1,5 @@
 # move_sugestao_treinamentoBll.py
+import string
 from sys import exception
 from typing import Optional
 from sklearn.covariance import empirical_covariance
@@ -30,6 +31,7 @@ class move_sugestao_treinamentoBLL:
             self.logger = logger.log
             self.min_similarity =  98.5
             self.check_collidingBll = check_collidingBLLModule(session)
+            self.ids_a_mover_qdrant_final = []
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar move_sugestao_treinamentoBLL: {e}")
 
@@ -41,8 +43,8 @@ class move_sugestao_treinamentoBLL:
                raise RuntimeError(f"Erro em _get_ids_to_move id {idBase} não encontrado na collection {self.train_collection}")
             else:
                 regbase = self.qdrant_utils.get_id(id=idBase,collection_name=self.final_collection)#verifica se existe na collection final
-                self._move_to_textos_treinamento(idBase,codclasse)                                                                          
-                self._move_to_qdrant_final(idBase,registro["Embedding"],codclasse,classe)#tem que atualizar no qdrant pois os embeddings podem ter sido recalculados
+                self._move_to_textos_treinamento(idBase,codclasse)
+                self.ids_a_mover_qdrant_final.append(idBase)#adiciona para mover depois que todos os duplicados forem apagados                
             
      
             for item in list_duplicados:
@@ -60,8 +62,7 @@ class move_sugestao_treinamentoBLL:
                 if registro_train is None:
                     raise RuntimeError(f"Aviso: ID {idBase} não encontrado na collection train, pulando")
                 
-                self._move_to_textos_treinamento(idBase, codclasse)  # Move para textos_treinamento
-                self._move_to_qdrant_final(idBase, registro_train["Embedding"], codclasse, classe)  # Move para Qdrant final
+                self._move_to_textos_treinamento(idBase, codclasse)  # Move para textos_treinamento                
                 return 1#server para dizer que moveu e incrementar a contagem
             else:
                 return 0
@@ -171,6 +172,18 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             raise RuntimeError(f"Erro ao deletar id {idSimilar} sugestao_textos_classificar: {e}")
         
+    def _move_ids_to_qdrant_final(self,CodClasse:int, Classe: str) -> None:
+        try:
+            for id in self.ids_a_mover_qdrant_final:
+                registro = self.qdrant_utils.get_id(id=id, collection_name=self.train_collection)
+                if registro is None:
+                    raise RuntimeError(f"Aviso: ID {id} não encontrado na collection train, pulando")
+                    continue
+                
+                self._move_to_qdrant_final(id, registro["Embedding"], CodClasse, Classe)
+        except Exception as e:
+            raise RuntimeError(f"Erro ao mover ids para Qdrant final: {e}") 
+        
     def _check_reg_exists_in_sugestao_textos_classificar(self, idBase: int,idSimilar:int) -> bool:
         query = f"SELECT COUNT(*) FROM sugestao_textos_classificar WHERE IdBase = :IdBase AND IdSimilar = :IdSimilar"
         result = self.session.execute(text(query), {"IdBase": idBase, "IdSimilar": idSimilar}).scalar()
@@ -180,7 +193,7 @@ class move_sugestao_treinamentoBLL:
         try:    
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
                 raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
-                       
+            
             #Bloco que procura o idBase
             idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)            
             if not idFound:
@@ -191,7 +204,10 @@ class move_sugestao_treinamentoBLL:
             if len(itens_colidentes) > 0:
                 return {
                     "status": "ERROR",
-                    "mensagem": f"Foram encontradas colisões de classe para o idBase {idBase} fornecido. Impossível mover para treinamento.",
+                    "mensagem": f"""Foram encontradas colisões de classe para o idBase {idBase} fornecido.\n
+                            Classe ja definida como {itens_colidentes[0]['Classe']}.\n
+                            Impossível mover para treinamento.\n
+                            Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
                     "itens_colidentes": itens_colidentes
                 }
 
@@ -205,10 +221,14 @@ class move_sugestao_treinamentoBLL:
             if len(itens_colidentes) > 0:
                 return {
                     "status": "ERROR",
-                    "mensagem": f"Foram encontradas colisões de classe para o idSimilar {idSimilar} fornecido. Impossível mover para treinamento.",
+                    "mensagem": f"""Foram encontradas colisões de classe para o idSimilar {idSimilar} fornecido.\n
+                            Classe ja definida como {itens_colidentes[0]['Classe']}.\n 
+                            Impossível mover para treinamento.\n 
+                            Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
                     "itens_colidentes": itens_colidentes
                 }
             
+            self.ids_a_mover_qdrant_final = []
             classe = self._get_classe(CodClasse)
             result = self._get_ids_to_move(idBase, idSimilar,CodClasse,classe)
             ids_to_move = result[0]# lista de ids a mover
@@ -223,14 +243,14 @@ class move_sugestao_treinamentoBLL:
                     raise RuntimeError(f"Aviso: ID {id} não encontrado na collection train, pulando")
                     continue                
                         
-                self._move_to_qdrant_final(id, id_Data["Embedding"], CodClasse, classe)# Move para Qdrant final (insere ou atualiza)
-              
-                self._move_to_textos_treinamento(id, CodClasse)  # Move para textos_treinamento
-                
+                self.ids_a_mover_qdrant_final.append(id)#adiciona para mover depois que todos os duplicados forem apagados                              
+                self._move_to_textos_treinamento(id, CodClasse)  # Move para textos_treinamento                
                 moved_ids.append(id)
 
             #grava as mudanças no banco de dados idéia é que tudo seja feito numa transação só
             self.session.commit()
+            #Agora move todos os ids para a coleção final do Qdrant
+            self._move_ids_to_qdrant_final(CodClasse=CodClasse, Classe=classe)
 
             total_movido = len(moved_ids) + qtd_movida_igual
             sucessMessage = f"Movidos {total_movido} registros para treinamento e Qdrant final"
