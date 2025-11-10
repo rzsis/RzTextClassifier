@@ -68,7 +68,40 @@ class move_sugestao_treinamentoBLL:
                 return 0
         except Exception as e:
             raise RuntimeError(f"Erro em check_idBase_in_final_collection para ID {idBase}: {e}")
+
+    def _get_ids_iguais_adicionais(self, idBase: int, idSimilar: int, ids_to_move: list[int]) -> list[int]:      
+        try:
+            query = f"""
+                SELECT tc.TxtTreinamento
+                    from  textos_classificar tc
+                    WHERE  tc.id in (select stc.idSimilar from sugestao_textos_classificar stc
+	                    where IdBase = {idBase} and idSimilar = {idSimilar})
+            """
     
+            row = self.session.execute(text(query)).mappings().all()
+            if not row:
+                return ids_to_move
+            
+            texto_treinamento = row[0]['TxtTreinamento']
+            query = f"""
+                    SELECT tc.id, tc.TxtTreinamento
+                        from  textos_classificar tc
+                        inner join sugestao_textos_classificar stc on tc.id = stc.IdSimilar 
+                        WHERE  tc.TxtTreinamento = '{texto_treinamento}'
+                        and tc.id in (select IdSimilar  from sugestao_textos_classificar where idBase = {idBase})
+            """
+
+            rows = self.session.execute(text(query)).mappings().all()    
+            if not rows:
+                return ids_to_move
+                                  
+            for row in rows:
+                ids_to_move.append(row['id'])
+
+            return ids_to_move    
+        
+        except Exception as e:
+            raise RuntimeError(f"Erro ao obter IDs iguais adicionais para IDBase {idBase}: {e}")
 
     #Determina os IDs inferiores a min_similarity para mover para treinamento, move e apaga os ids duplicados (igual a 100) para a base de treinamento
     def _get_ids_to_move(self, idBase: int, idSimilar: int, codclasse:int, classe:str) -> tuple[list[int],int]:        
@@ -89,9 +122,11 @@ class move_sugestao_treinamentoBLL:
         if lista_duplicados:        
             self._move_ids_duplicados(lista_duplicados, idBase, codclasse, classe)          
 
-        if (len(ids_to_move) == 0) and (len(lista_duplicados) == 0):#se não tiver nada é porque é porque não tem ninguem acima do min_similarity e ai deve pegar o idSimilar e o base
+        if (len(ids_to_move) == 0) and (len(lista_duplicados) == 0):#se não tiver nada é porque não tem ninguem acima do min_similarity e ai deve pegar o idSimilar e o base
             ids_to_move.append(idSimilar)
             qtdmovida = self.check_idBase_in_final_collection(idBase, codclasse, classe)#Isso é necessario pois caso a semelhança não seja 100% o idBase pode não ter sido movido ainda
+
+        ids_to_move = self._get_ids_iguais_adicionais(idBase=idBase, idSimilar=idSimilar, ids_to_move=ids_to_move)
                                 
         return list(set(ids_to_move)),(len(lista_duplicados)+qtdmovida)
 
@@ -156,13 +191,7 @@ class move_sugestao_treinamentoBLL:
                                     classe=classe)
     
         #apaga da colection de treinamento
-        self.qdrant_utils.delete_id(collection_name=self.train_collection, id=id)
-
-    #Remove um ID registro da tabela textos_classificar
-    def _delete_id_from_textos_classificar(self, id: int) -> None:        
-        query_delete = "DELETE FROM textos_classificar WHERE id = :id"
-        self.session.execute(text(query_delete), {"id": id})
-        self.qdrant_utils.delete_id(collection_name=self.train_collection, id=id)        
+        self.qdrant_utils.delete_id(collection_name=self.train_collection, id=id)     
 
     #Remove todos os registros relacionados ao idBase da tabela sugestao_textos_classificar.
     def _delete_sugestao_textos_classificar(self, idSimilar: int) -> None:                      
@@ -172,6 +201,27 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             raise RuntimeError(f"Erro ao deletar id {idSimilar} sugestao_textos_classificar: {e}")
         
+    #apaga textos duplicados na tabela textos_treinamento que foram movidos nesta batch
+    def _delete_textos_duplicados_treinamento(self):
+        qtdDuplicadosMovidos = 0    
+        ids_str = ",".join(str(i) for i in self.ids_a_mover_qdrant_final)        
+        sql = f"""
+            select t.id,t.TxtTreinamento, Count(*) As QtdDuplicado, GROUP_CONCAT(t.id ) as IdsDuplicados from textos_treinamento t
+                where t.id in ({ids_str})
+                group by t.TxtTreinamento
+                HAVING Count(*) > 1 
+            """
+        rows = self.session.execute(text(sql)).mappings().all()
+        for row in rows:
+            for id_to_delete in row["IdsDuplicados"].split(",")[1:]: #mantém o primeiro, deleta os outros
+                delete_sql = "DELETE FROM textos_treinamento WHERE id = :id"
+                self.session.execute(text(delete_sql), {"id": int(id_to_delete)})
+                self.qdrant_utils.delete_id(collection_name=self.final_collection, id=int(id_to_delete))
+                qtdDuplicadosMovidos += 1
+        
+        print_with_time(f"Removidos {qtdDuplicadosMovidos} textos duplicados na tabela textos_treinamento e Qdrant final.")
+        self.session.commit()
+                        
     def _move_ids_to_qdrant_final(self,CodClasse:int, Classe: str) -> None:
         try:
             for id in self.ids_a_mover_qdrant_final:
@@ -181,6 +231,9 @@ class move_sugestao_treinamentoBLL:
                     continue
                 
                 self._move_to_qdrant_final(id, registro["Embedding"], CodClasse, Classe)
+
+            self._delete_textos_duplicados_treinamento()#apaga os textos duplicados na tabela textos_treinamento e no qdrant final
+                
         except Exception as e:
             raise RuntimeError(f"Erro ao mover ids para Qdrant final: {e}") 
         
@@ -227,6 +280,7 @@ class move_sugestao_treinamentoBLL:
                             Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
                     "itens_colidentes": itens_colidentes
                 }
+        
             
             self.ids_a_mover_qdrant_final = []
             classe = self._get_classe(CodClasse)
@@ -269,3 +323,5 @@ class move_sugestao_treinamentoBLL:
                 "status": "ERROR",
                 "mensagem": errorMessage
             }
+        finally:
+            self.session.close()
