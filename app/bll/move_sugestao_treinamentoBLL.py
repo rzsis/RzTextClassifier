@@ -12,12 +12,9 @@ from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
 
 class move_sugestao_treinamentoBLL:
+    
+    #Inicializa a classe para mover sugestões de classificação do banco de dados para treinamento para o oficial usando Qdrant e SQL
     def __init__(self, session: Session):
-        """
-        Inicializa a classe para mover sugestões de classificação para treinamento usando Qdrant e SQL.
-        Args:
-            session (Session): Sessão SQLAlchemy para operações no banco.
-        """
         try:
             from main import localconfig as localcfg
             self.session = session
@@ -69,6 +66,7 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             raise RuntimeError(f"Erro em check_idBase_in_final_collection para ID {idBase}: {e}")
 
+    #Função desta rotina é quanto um texto que não tem 100% de similaridade mais tem mesmo textos nos similares retorne todos os similares para migrar mais textos por vez.
     def _get_ids_iguais_adicionais(self, idBase: int, idSimilar: int, ids_to_move: list[int]) -> list[int]:      
         try:
             query = f"""
@@ -142,22 +140,7 @@ class move_sugestao_treinamentoBLL:
             return result[0]["Classe"]
         
         except Exception as e:
-            raise RuntimeError(f"Erro ao obter classe em _get_classe: {e}")
-        
-
-    def _get_text_data(self, id_: int) -> Optional[dict]:
-        """Obtém dados do texto da tabela textos_classificar."""
-        query_get = """
-            SELECT DataEvento, Documento, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
-                   TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni
-            FROM textos_classificar
-            WHERE id = :id
-        """
-        row = self.session.execute(text(query_get), {"id": id_}).mappings().first()
-        if row is None:
-            print_with_time(f"Aviso: ID {id_} não encontrado em textos_classificar, pulando")
-            return None
-        return dict(row)
+            raise RuntimeError(f"Erro ao obter classe em _get_classe: {e}")       
     
     #Move um registro para a tabela textos_treinamento
     def _move_to_textos_treinamento(self, id: int, CodClasse: int) -> None:
@@ -222,6 +205,7 @@ class move_sugestao_treinamentoBLL:
         print_with_time(f"Removidos {qtdDuplicadosMovidos} textos duplicados na tabela textos_treinamento e Qdrant final.")
         self.session.commit()
                         
+    #Move os IDs coletados para a coleção final do Qdrant.                    
     def _move_ids_to_qdrant_final(self,CodClasse:int, Classe: str) -> None:
         try:
             for id in self.ids_a_mover_qdrant_final:

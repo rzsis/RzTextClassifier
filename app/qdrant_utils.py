@@ -179,6 +179,18 @@ class Qdrant_Utils:
     #
     def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ) -> boolean:
         try:
+            if (codclasse is None):
+                raise RuntimeError(f"CodClasse não pode ser None para o ID {id} na coleção {collection_name}")
+            
+            if (classe is None) or (classe.strip() == ""): 
+                raise RuntimeError(f"Classe não pode ser None para o ID {id} na coleção {collection_name}")
+            
+            if (embeddings is None) or (len(embeddings) == 0):
+                raise RuntimeError(f"Embeddings não pode ser None ou vazio para o ID {id} na coleção {collection_name}")
+
+            if len(embeddings) != self.collectionSize:
+                raise RuntimeError(f"Embeddings para o ID {id} na coleção {collection_name} tem tamanho {len(embeddings)}, esperado {self.collectionSize}")
+
             payload={        
                     "Id": id,
                     "Classe": classe,
