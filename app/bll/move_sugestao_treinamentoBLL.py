@@ -1,7 +1,9 @@
 # move_sugestao_treinamentoBll.py
+from ast import Dict
 import string
 from sys import exception
 from typing import Optional
+from pkg_resources import UnknownExtra
 from sklearn.covariance import empirical_covariance
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -226,49 +228,83 @@ class move_sugestao_treinamentoBLL:
         result = self.session.execute(text(query), {"IdBase": idBase, "IdSimilar": idSimilar}).scalar()
         return (result or 0) > 0
 
-    def move_sugestao_treinamento(self, idBase: int, idSimilar: int, CodClasse: int) -> dict:
-        try:    
-            if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
-                raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
-            
-            #Bloco que procura o idBase
+    #verifica se o idBase colidem com outras classes e retorna um erro caso colida para parar a movimentação
+    def _check_coliding_idBase(self, idBase:int, codClasse:int, mover_com_colidencia:bool) -> dict | None:
+        try:
+            if mover_com_colidencia:               
+                return None
+
             idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)            
             if not idFound:
                 idFound = self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
                 if not idFound:
                     raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção de treinamento ou na coleção final.")                
-            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,CodClasse)
-            if len(itens_colidentes) > 0:
-                return {
-                    "status": "ERROR",
-                    "mensagem": f"""Foram encontradas colisões de classe para o idBase {idBase} fornecido.\n
-                            Classe ja definida como {itens_colidentes[0]['Classe']}.\n
-                            Impossível mover para treinamento.\n
-                            Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
-                    "itens_colidentes": itens_colidentes
-                }
 
-            #Bloco que procura o idSimilar
+            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idBase,codClasse)
+            if len(itens_colidentes) > 0:
+                    return {
+                        "status": "ERROR",
+                        "mensagem": f"""Foram encontradas colisões de classe para o idBase {idBase} fornecido.\n
+                                Classe ja definida como {itens_colidentes[0]['Classe']}.\n
+                                Impossível mover para treinamento.\n
+                                Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
+                        "itens_colidentes": itens_colidentes
+                    }
+                
+            return None
+        
+        except Exception as e:
+            raise RuntimeError(f"Erro ao verificar colisão para _check_coliding_idBase {idBase}: {e}")
+
+    #verifica se o idSimilar colidem com outras classes e retorna um erro caso colida para parar a movimentação
+    def _check_coliding_idSimilar(self, idSimilar:int, codClasse:int, mover_com_colidencia:bool) -> dict | None:
+        try:
+            if mover_com_colidencia:               
+                return None
+                        
             idFound = self.qdrant_utils.get_id(id=idSimilar, collection_name=self.train_collection)   
             if not idFound:
                 idFound = self.qdrant_utils.get_id(id=idSimilar, collection_name=self.final_collection)#ele pode estar na coleção final pois ja foi movido anteriormente
                 if not idFound:
                     raise RuntimeError(f"Erro: O IdSimilar {idSimilar} não foi encontrado na coleção de treinamento ou na coleção final.")                
-            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idSimilar,CodClasse)
+                            
+            itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"],idSimilar,codClasse)
             if len(itens_colidentes) > 0:
-                return {
-                    "status": "ERROR",
-                    "mensagem": f"""Foram encontradas colisões de classe para o idSimilar {idSimilar} fornecido.\n
-                            Classe ja definida como {itens_colidentes[0]['Classe']}.\n 
-                            Impossível mover para treinamento.\n 
-                            Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
-                    "itens_colidentes": itens_colidentes
-                }
+                    return {
+                        "status": "ERROR",
+                        "mensagem": f"""Foram encontradas colisões de classe para o idSimilar {idSimilar} fornecido.\n
+                                Classe ja definida como {itens_colidentes[0]['Classe']}.\n 
+                                Impossível mover para treinamento.\n 
+                                Pressione 'Salvar Mesmo colidindo' caso queira forçar a classe.""",
+                        "itens_colidentes": itens_colidentes
+                    }
+                
+            return None        
+        except Exception as e:  
+            raise RuntimeError(f"Erro ao verificar colisão para _check_coliding_idSimilar {idSimilar}: {e}")    
         
+    #Main method to move suggested training texts based on similarity and class.
+    #CodUser vem da interface do usuario
+    #mover_com_colidencia serve para ignorar a verificação de colisão de classes caso o usuario queira forçar a movimentação
+    def move_sugestao_treinamento(self, idBase: int, idSimilar: int, codClasse, coduser:int , mover_com_colidencia:bool=False) -> dict:
+        try:    
+            if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
+                raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
+            
+            #Bloco que procura o colidencias com idBase
+            result = self._check_coliding_idBase(idBase=idBase,codClasse=codClasse,mover_com_colidencia=mover_com_colidencia)
+            if (result is not None):
+                return result
+            
+            #Bloco que procura o colidencias com idSimilar
+            result = self._check_coliding_idSimilar(idSimilar=idSimilar,codClasse=codClasse,mover_com_colidencia=mover_com_colidencia)
+            if (result is not None):
+                return result
+       
             
             self.ids_a_mover_qdrant_final = []
-            classe = self._get_classe(CodClasse)
-            result = self._get_ids_to_move(idBase, idSimilar,CodClasse,classe)
+            classe = self._get_classe(codClasse)
+            result = self._get_ids_to_move(idBase, idSimilar,codClasse,classe)
             ids_to_move = result[0]# lista de ids a mover
             qtd_movida_igual = result[1] #quantidade de ids iguais 100 que já foram movidos para treinamento
             moved_ids = []
@@ -282,13 +318,13 @@ class move_sugestao_treinamentoBLL:
                     continue                
                         
                 self.ids_a_mover_qdrant_final.append(id)#adiciona para mover depois que todos os duplicados forem apagados                              
-                self._move_to_textos_treinamento(id, CodClasse)  # Move para textos_treinamento                
+                self._move_to_textos_treinamento(id, codClasse)  # Move para textos_treinamento                
                 moved_ids.append(id)
 
             #grava as mudanças no banco de dados idéia é que tudo seja feito numa transação só
             self.session.commit()
             #Agora move todos os ids para a coleção final do Qdrant
-            self._move_ids_to_qdrant_final(CodClasse=CodClasse, Classe=classe)
+            self._move_ids_to_qdrant_final(CodClasse=codClasse, Classe=classe)
 
             total_movido = len(moved_ids) + qtd_movida_igual
             sucessMessage = f"Movidos {total_movido} registros para treinamento e Qdrant final"

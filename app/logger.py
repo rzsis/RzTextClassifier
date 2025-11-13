@@ -12,45 +12,52 @@ from fastapi import HTTPException
 from starlette.responses import JSONResponse
 from logging.handlers import RotatingFileHandler
 
+from common import print_with_time
+
 log: logging.Logger
 
 # -----------------------------
 # Logger único da aplicação
 # -----------------------------
 def build_logger(appName: str) -> logging.Logger:
-    global log
-    log = logging.getLogger("app")
-    if log.handlers:  # evita duplicar handlers em reload
+    try:    
+        global log
+        log = logging.getLogger("app")
+        if log.handlers:  # evita duplicar handlers em reload
+            return log
+
+        log_path = "../log/"
+        os.makedirs(log_path, exist_ok=True)
+        log_fileName = f"{log_path}{appName}.log"
+
+        # Use RotatingFileHandler for file logging with rotation
+        handler = RotatingFileHandler(
+            log_fileName,
+            maxBytes=2 * 1024 * 1024,  # 2 MB
+            backupCount=5,             # Keep up to 5 backup files
+            encoding="utf-8"
+        )
+        handler.setLevel(logging.DEBUG)
+
+        # Console handler for INFO-level output
+        ch = logging.StreamHandler(sys.stdout)
+        ch.setLevel(logging.INFO)
+
+        # Formatter for both handlers
+        fmt = logging.Formatter("%(message)s")
+        handler.setFormatter(fmt)
+        ch.setFormatter(fmt)
+
+        log.setLevel(logging.DEBUG)
+        log.addHandler(handler)
+        log.addHandler(ch)
+        log.propagate = False
+
         return log
-
-    log_path = "../log/"
-    os.makedirs(log_path, exist_ok=True)
-    log_fileName = f"{log_path}{appName}.log"
-
-    # Use RotatingFileHandler for file logging with rotation
-    handler = RotatingFileHandler(
-        log_fileName,
-        maxBytes=2 * 1024 * 1024,  # 2 MB
-        backupCount=5,             # Keep up to 5 backup files
-        encoding="utf-8"
-    )
-    handler.setLevel(logging.DEBUG)
-
-    # Console handler for INFO-level output
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-
-    # Formatter for both handlers
-    fmt = logging.Formatter("%(message)s")
-    handler.setFormatter(fmt)
-    ch.setFormatter(fmt)
-
-    log.setLevel(logging.DEBUG)
-    log.addHandler(handler)
-    log.addHandler(ch)
-    log.propagate = False
-
-    return log
+    except Exception as e:     
+        print_with_time(f"[LOGGER ERROR] {e}")
+        # 🔴 E encerra a aplicação → systemd para o serviço
+        sys.exit(1)
 
 # -----------------------------
 # Decorator opcional para funções críticas

@@ -80,7 +80,9 @@ async def indexa_textos_classificar(session: Session = Depends(get_session_db)  
 @router.post("/move_sugestao_treinamento")
 async def move_sugestao_treinamento(idbase:int,
                                     idsimilar:int,
-                                    codclasse:int,
+                                    codclasse:int,                                    
+                                    coduser:int,
+                                    mover_com_colidencia:bool=False,
                                     session: Session = Depends(get_session_db)  ):        
 
     try:             
@@ -88,7 +90,9 @@ async def move_sugestao_treinamento(idbase:int,
 
         return move_sugestao_treinamentoBll.move_sugestao_treinamento(idBase=idbase,
                                                                 idSimilar=idsimilar,
-                                                                CodClasse=codclasse)
+                                                                codClasse=codclasse,
+                                                                coduser=coduser,
+                                                                mover_com_colidencia=mover_com_colidencia)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
