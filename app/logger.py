@@ -17,8 +17,7 @@ log: logging.Logger
 # -----------------------------
 # Logger único da aplicação
 # -----------------------------
-def build_logger(appName: str) -> logging.Logger:
-    from common import print_with_time    
+def build_logger(appName: str) -> logging.Logger:    
     try:    
         global log
         log = logging.getLogger("app")
@@ -33,7 +32,7 @@ def build_logger(appName: str) -> logging.Logger:
         handler = RotatingFileHandler(
             log_fileName,
             maxBytes=2 * 1024 * 1024,  # 2 MB
-            backupCount=5,             # Keep up to 5 backup files
+            backupCount=2,             # Keep up to 5 backup files
             encoding="utf-8"
         )
         handler.setLevel(logging.DEBUG)
@@ -54,8 +53,8 @@ def build_logger(appName: str) -> logging.Logger:
 
         return log
     except Exception as e:     
-        print_with_time(f"[LOGGER ERROR] {e}")
-        # 🔴 E encerra a aplicação → systemd para o serviço
+        # 🔴 E encerra a aplicação → systemd para o serviço        
+        print(f"Erro na inicialização do logger {e}")#não pode usar print_with_time aqui, pois logger pode não estar inicializado        
         sys.exit(1)
 
 # -----------------------------
