@@ -12,14 +12,13 @@ from fastapi import HTTPException
 from starlette.responses import JSONResponse
 from logging.handlers import RotatingFileHandler
 
-from common import print_with_time
-
 log: logging.Logger
 
 # -----------------------------
 # Logger único da aplicação
 # -----------------------------
 def build_logger(appName: str) -> logging.Logger:
+    from common import print_with_time    
     try:    
         global log
         log = logging.getLogger("app")
