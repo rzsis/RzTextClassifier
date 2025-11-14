@@ -12,6 +12,7 @@ from common import print_with_time, print_error
 import logger
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
+from bll.salva_log_AlteracoesBll import salva_log_AlteracoesBll as salva_log_AlteracoesBllModule
 
 class move_sugestao_treinamentoBLL:
     
@@ -31,6 +32,8 @@ class move_sugestao_treinamentoBLL:
             self.min_similarity =  98.5
             self.check_collidingBll = check_collidingBLLModule(session)
             self.ids_a_mover_qdrant_final = []
+            self.salva_log_alteracoesBll = salva_log_AlteracoesBllModule(session)
+
         except Exception as e:
             raise RuntimeError(f"Erro ao inicializar move_sugestao_treinamentoBLL: {e}")
 
@@ -321,6 +324,10 @@ class move_sugestao_treinamentoBLL:
                 self._move_to_textos_treinamento(id, codClasse)  # Move para textos_treinamento                
                 moved_ids.append(id)
 
+
+            #grava log das alterações
+            self.salva_log_alteracoesBll.insert_log_texto_treinamento(ids=moved_ids, codUser=coduser, auto_commit=False)
+            
             #grava as mudanças no banco de dados idéia é que tudo seja feito numa transação só
             self.session.commit()
             #Agora move todos os ids para a coleção final do Qdrant
