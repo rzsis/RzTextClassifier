@@ -37,7 +37,7 @@ class edit_textos_treinamentoBLL:
                         
             sql = text("""
                 UPDATE textos_treinamento
-                SET cod_classe = :codClasse
+                SET cod_classe = :codClasse,DataHoraEdit = CURRENT_TIMESTAMP
                 WHERE id = :id
             """)
             self._session.execute(sql, {"codClasse": codClasse, "id": id})

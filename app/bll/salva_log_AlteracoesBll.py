@@ -25,7 +25,7 @@ class salva_log_AlteracoesBll:
             sql = text(f"SELECT CodTabela FROM tabelas WHERE tabela = :tabela")
             result = self.session.execute(sql, {'tabela': tabela}).fetchone()
             if result:
-                return result['CodTabela']
+                return result[0]
             else:
                 raise RuntimeError(f"Tabela '{tabela}' não encontrada.")
             
@@ -35,16 +35,17 @@ class salva_log_AlteracoesBll:
     #insere log de alterações para textos_treinamento
     def insert_log_texto_treinamento(self, ids:list[int], codUser:int, auto_commit:bool=False):
         try:
+            codtabela = self._get_cod_tabela_by_name('textos_treinamento')
             for id in ids:
                 sql = text(f"""
-                    INSERT INTO usuarioslogalteracoes (Key,CodUser, TipoAlteracao, CodTabela,DataHora)
+                    INSERT INTO usuarioslogalteracoes (`Key`, CodUser, TipoAlteracao, DataHora, CodTabela)
                     VALUES (:key, :cod_user, :tipo_alteracao, CURRENT_TIMESTAMP, :CodTabela)
                 """)
                 self.session.execute(sql, {
-                    'key': ids,                  
+                    'key': id,                  
                     'cod_user': codUser, 
                     'tipo_alteracao': 'I',              
-                    'CodTabela': self._get_cod_tabela_by_name('textos_treinamento'),                                
+                    'CodTabela': codtabela,                                
                 })
             
             
@@ -55,4 +56,4 @@ class salva_log_AlteracoesBll:
             if auto_commit:
                 self.session.rollback()                
 
-            raise Exception(f"Erro ao inserir log de alterações para textos_treinamento: {str(e)}")
+            raise RuntimeError(f"Erro ao inserir log de alterações para textos_treinamento: {str(e)}")

@@ -176,15 +176,18 @@ class Qdrant_Utils:
         except Exception as e:
             print_with_time(f"Erro ao apagar Id {id}: {e}")
 
-    #
+    #Insere ou atualiza um ID no qdrant
     def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ) -> boolean:
         try:
-            if (codclasse is None):
+            #só deve obrigar codclasse e classe na coleção final
+            final_collection = self.get_collection_name("final")
+            if (collection_name == final_collection)  and (codclasse is None):
                 raise RuntimeError(f"CodClasse não pode ser None para o ID {id} na coleção {collection_name}")
             
-            if (classe is None) or (classe.strip() == ""): 
+            if (collection_name == final_collection)  and ((classe is None) or (classe.strip() == "")): 
                 raise RuntimeError(f"Classe não pode ser None para o ID {id} na coleção {collection_name}")
             
+            #embeddings não pode ser None ou vazio
             if (embeddings is None) or (len(embeddings) == 0):
                 raise RuntimeError(f"Embeddings não pode ser None ou vazio para o ID {id} na coleção {collection_name}")
 
