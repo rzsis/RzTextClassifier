@@ -5,8 +5,6 @@ from controllers import edit_text_contoller
 #Necessario colocar ja inicio para pegar antes de importar torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
 os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
-os.environ["XFORMERS_DISABLED"] = "1"
-os.environ["ATTN_IMPLEMENTATION"] = "eager"  # antes de importar transformers
 
 from operator import index
 from fastapi import FastAPI

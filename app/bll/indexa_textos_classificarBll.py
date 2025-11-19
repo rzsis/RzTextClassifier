@@ -170,23 +170,31 @@ class indexa_textos_classificarBll:
 
         # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
         processed_data = []
-        for i, row in enumerate(tqdm(data, desc="Gerando embeddings")):
-            try:
-                embedding = embeddingsBllModule.bllEmbeddings.generate_embedding(row['Text'],row['id'])
-                # Clear cache every X batches
-                if i % 20 == 0:
-                     self.gpu_utils.clear_gpu_cache()
+        batch_size = 32  # Ajuste conforme a capacidade da sua GPU (ex: 16, 32, 64)
 
-                processed_data.append({
-                    'Id': row['id'],
-                    'Embedding': embedding,
-                    'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
-                })
-
+        for i in tqdm(range(0, len(data), batch_size), desc="Gerando embeddings em batches"):
+            batch = data[i:i + batch_size]
+            texts = [row['Text'] for row in batch]
+            ids = [row['id'] for row in batch]
+            
+            try:                
+                embeddings = embeddingsBllModule.bllEmbeddings.generate_embeddings(texts, ids)
+                
+                for j, embedding in enumerate(embeddings):
+                    processed_data.append({
+                        'Id': ids[j],
+                        'Embedding': embedding,
+                        'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
+                    })
+                
+                # Clear cache a cada batch processado (ajuste a frequência se necessário)
+                self.gpu_utils.clear_gpu_cache()
+            
             except Exception as e:
-                self.logger.error(f"Erro ao gerar embedding para id {row['id']}: {e}")
-                               
-        self.gpu_utils.clear_gpu_cache()
+                self.logger.error(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
+
+        self.gpu_utils.clear_gpu_cache()  # Limpeza final
+                                       
 
         # Insere no Qdrant em lotes menores e atualiza UpInsertOk
         insert_qDrant_Batch_Size = 200  # Define o tamanho do lote

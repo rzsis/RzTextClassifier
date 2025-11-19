@@ -26,6 +26,7 @@ import time
 
 ##################################################
 ####################################################
+# Sugere textos para classificar baseado em textos similares encontrados no Qdrant
 # Idéia do algoritmo:
 # 1 - Primeiro indexa todos os textos que faltam buscar similares no qdrant na base de treinamento que não foram classificados
 # 2 - Buscar textos que não buscaram similar ainda primeiro encontrando os duplicados que são literalmente iguais e inserir em sugestao_textos_classificar
@@ -495,7 +496,25 @@ class sugere_textos_classificarBll:
         except Exception as e:
            print_with_time(f"Erro ao inserir similares para texto id {id_texto}: {e}")   
 
-    #pega todos os textos pendentes que o sistema não buscou similar procura similares agrupa por similaridade
+    #atualiza os campos DataEvento e QtdPalavras na tabela sugestao_textos_classificar para aumentar a performance nas consultas
+    #faz somente aqui pois pegar essa informação na hora da consulta é muito custoso
+    def _update_textos_classificar(self):
+        try:
+            query = """
+              Update sugestao_textos_classificar stc 
+                inner join textos_classificar tc on tc.id  = stc.IdSimilar 
+                set stc.DataEvento = tc.DataEvento,
+                stc.QtdPalavras = tc.QtdPalavras
+                WHERE 
+                stc.QtdPalavras is null or stc.QtdPalavras = 0
+                or stc.DataEvento is null                 
+            """
+            self.session.execute(text(query))
+            self.session.commit()
+        except Exception as e:
+            print_with_time(f"Erro em _update_textos_classificar: {e}")
+            self.session.rollback()
+
     #para depois o usuario sugerir classificações
     def sugere_textos_para_classificar(self) -> dict:
         try:
@@ -533,7 +552,7 @@ class sugere_textos_classificarBll:
 
             self._inc_nivel_similaridade(data)
             self.gpu_utils.clear_gpu_cache()
-
+            self._update_textos_classificar()
             tempo_decorrido_min = (time.time() - inicio) / 60          
             sucessMessage = f"Inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
 

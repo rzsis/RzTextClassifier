@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import Any, List, Optional
 import numpy as np
-import faiss
 from sqlalchemy import RowMapping, Sequence, text
 from sympy import Id
 import torch

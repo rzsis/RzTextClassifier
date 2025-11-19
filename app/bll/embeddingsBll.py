@@ -1,14 +1,11 @@
 # embeddingsBll.py
 import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
-os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
-
 import numpy as np
 from transformers import AutoTokenizer, AutoModel
 import torch
 from db_utils import Session
 import gpu_utils as gpu_utilsModule
-from typing import Dict, List, Optional
+from typing import  List, Optional,Union
 from common import print_with_time
 import logger
 from qdrant_utils import Qdrant_Utils as qdrant_utilsModule
@@ -42,6 +39,78 @@ class EmbeddingsBll:
         self.tokenizer = None
         self.model = None
 
+
+    #Gera embeddings para uma lista de textos agilizando assim a indexação
+    def generate_embeddings(self, texts: Union[str, List[str]], ids: Optional[Union[int, List[int]]] = None) -> Union[Optional[np.ndarray], List[Optional[np.ndarray]]]:
+    
+        if isinstance(texts, str):
+            texts = [texts]
+            single_mode = True
+        else:
+            single_mode = False
+        
+        if ids is not None:
+            if isinstance(ids, int):
+                ids = [ids]
+            if len(ids) != len(texts):
+                raise ValueError("O número de IDs deve corresponder ao número de texts.")
+        else:
+            ids = [None] * len(texts) # type: ignore
+        
+        clean_texts = []
+        valid_indices = []
+        for idx, text in enumerate(texts):
+            try:
+                if not text or not isinstance(text, str):
+                    clean_texts.append(None)
+                    continue
+                
+                clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127)
+                clean_text = clean_text[0:self.max_txt_lenght].strip()
+
+                if not clean_text:
+                    clean_texts.append(None)
+                    continue
+                
+                clean_texts.append(clean_text)
+                valid_indices.append(idx)
+            except Exception as e:
+                raise RuntimeError(f"Erro ao limpar texto para ID {ids[idx]}: {e}") # type: ignore
+        
+        if not valid_indices:
+            return None if single_mode else [None] * len(texts) # type: ignore
+        
+        try:
+            inputs = self.tokenizer(
+                [clean_texts[i] for i in valid_indices],
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_length,
+                padding=True
+            ).to(self.model.device) # type: ignore
+            
+            with torch.no_grad():
+                outputs = self.model(**inputs) # type: ignore
+                embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            
+            del inputs, outputs
+            
+            embeddings = embeddings.astype('float32')
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            embeddings = np.divide(embeddings, norms, where=norms > 0)
+            
+            # Preenche os resultados na ordem original
+            results = [None] * len(texts)
+            for j, idx in enumerate(valid_indices):
+                results[idx] = embeddings[j].flatten()
+            
+            return results[0] if single_mode else results # type: ignore
+        
+        except Exception as e:
+            error_ids = [ids[i] for i in valid_indices if i in valid_indices] # type: ignore
+            error_texts = [clean_texts[i] for i in valid_indices if i in valid_indices]
+            raise RuntimeError(f"Erro ao gerar embeddings para IDs {error_ids} e texts {error_texts}: {e}")
+    
     #Gera embedding para um texto
     def generate_embedding(self, text: str, Id: Optional[int]) -> np.ndarray:        
         clean_text = ""
@@ -77,21 +146,28 @@ class EmbeddingsBll:
             return embedding.flatten()
         except Exception as e:
             raise RuntimeError(f"Erro ao gerar embedding para texto ID = {Id} -> {clean_text} : {e}")
-
-    def load_model_and_tokenizer(self) -> None:
-        """Carrega o modelo e tokenizer."""
+        
+    #Carrega o modelo e tokenizer."""
+    def load_model_and_tokenizer(self) -> None:       
         try:
             model_path = self.localconfig.getModelPath()
             if not os.path.exists(model_path):
                 raise RuntimeError(f"Diretório do modelo {model_path} não encontrado.")
             
+            use_gpu = torch.cuda.is_available()
+
             self.gpu_utils.clear_gpu_cache()
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-            self.model = AutoModel.from_pretrained(
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 model_path,
-                torch_dtype=torch.float32,
-                attn_implementation="eager"
-            ).to("cuda" if torch.cuda.is_available() else "cpu")
+                trust_remote_code=True
+            )
+
+            self.model = AutoModel.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float16 if use_gpu else torch.float32,
+                    trust_remote_code=True,
+                    device_map="auto"  # GPU se existir, CPU se não
+            ).eval()
 
             device_load = ""
             if next(self.model.parameters()).is_cuda:
@@ -99,7 +175,7 @@ class EmbeddingsBll:
             else:
                device_load = "🧠 Modelo e tokenizer carregados na CPU"
 
-            self.model.eval()
+
             print_with_time(f"{device_load} de {model_path} com dimensão {self.model.config.hidden_size}")
             
 
