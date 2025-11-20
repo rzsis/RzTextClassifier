@@ -53,12 +53,13 @@ async def classifica_textos_pendentes(session: Session = Depends(get_session_db)
     
 #endpoint para sugere textos a classificar
 @router.post("/sugere_textos_classificar")
-async def sugere_textos_classificar(session: Session = Depends(get_session_db)  ):        
+async def sugere_textos_classificar(NivelBuscaSimilar:int=0,
+    session: Session = Depends(get_session_db)  ):        
 
     try:     
         embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         sugere_textos_classificarBll = sugere_textos_classificarBllModule(session)
-        return sugere_textos_classificarBll.sugere_textos_para_classificar()
+        return sugere_textos_classificarBll.sugere_textos_para_classificar(NivelBuscaSimilar)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    

@@ -47,5 +47,10 @@ if __name__ == "__main__":
     HTTP_PORT = int(localconfig.get("http_port"))
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
     
-    uvicorn.run(fastApi, host="0.0.0.0", port=HTTP_PORT, log_level="info")
-
+    uvicorn.run(
+        "main:fastApi",          
+        host="0.0.0.0",
+        port=HTTP_PORT,
+        log_level="info",
+        workers=5,
+    )

@@ -172,14 +172,20 @@ class sugere_textos_classificarBll:
             qtd_inserido_similares = 0
             qtd_inserido = 0
             for item in tqdm(data,"Processando textos duplicados"):
-                already_exists = (item['IdBase'] in self.lista_sugestao_textos_classificar) or (item["IdSimilar"] in self.lista_sugestao_textos_classificar)
-                if already_exists:
+                already_exists = (item['IdBase'] in self.lista_sugestao_textos_classificar)
+                if already_exists:  
                     continue
                                     
                 lista_marcar_duplicados = []
-                lista_marcar_duplicados.append({"id":item["IdBase"]})            
+                lista_insercao_duplicados = []                
+
+                lista_marcar_duplicados.append({"id":item["IdBase"]})
+                #insere ele mesmo na lista para ter IdBase,IdBase            
+                lista_insercao_duplicados.append({
+                            "IdEncontrado": item["IdBase"],
+                            "Similaridade": 1
+                        })
                 
-                lista_insercao_duplicados = []
                 for item_duplicado in item["IdsIguais"]:                    
                     lista_marcar_duplicados.append({"id":item_duplicado})
                     lista_insercao_duplicados.append({
@@ -516,7 +522,8 @@ class sugere_textos_classificarBll:
             self.session.rollback()
 
     #para depois o usuario sugerir classificações
-    def sugere_textos_para_classificar(self) -> dict:
+    #NivelBuscaSimilar = 0 pois assim ele só verifica o nivel atual caso maior ele vai incrementando e buscando mais similares até o nivel 5
+    def sugere_textos_para_classificar(self,NivelBuscaSimilar:int = 0,ContadorEntrada = 0) -> dict:
         try:
             #primeiro deve indexar tudo no qdrant para depois fazer a busca
             inicio = time.time()
@@ -524,13 +531,13 @@ class sugere_textos_classificarBll:
             indexa_textos_classificarBll.indexa_textos_classificar()
 
             print_with_time(f"Iniciando busca de textos duplicados...")
-            self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()            
+            self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem a lista atual ja inserida em sugestao_textos_classificar
             data = self._get_lista_textos_duplicados()
-            self._processa_textos_duplicados(data)
+            self._processa_textos_duplicados(data)                     
 
             print_with_time(f"Iniciando busca de textos similares...")
             data = self._get_textos_falta_buscar_similar()
-            self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()
+            self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem denovo a lista atual ja inserida em sugestao_textos_classificar 
 
             if not data:
                 sucessMessage = "Nenhum texto similar restante para classificar"
@@ -555,12 +562,19 @@ class sugere_textos_classificarBll:
             self._update_textos_classificar()
             tempo_decorrido_min = (time.time() - inicio) / 60          
             sucessMessage = f"Inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
+            itens_restantes = self._get_qtd_textos_falta_buscar_similar()
+            
+            #aqui caso faltem itens e o nivel de busca seja menor que 5 faz uma nova chamada recursiva para buscar mais similares
+            if (itens_restantes > 0) and ((NivelBuscaSimilar > 0) and (ContadorEntrada < 5)):
+                self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1)        
+                itens_restantes = self._get_qtd_textos_falta_buscar_similar()
+                
 
             print_with_time(sucessMessage)
             return {
                 "status": "OK",
                 "mensagem": sucessMessage,
-                "restante": f"{self._get_qtd_textos_falta_buscar_similar()}"
+                "restante": f"{itens_restantes}"
             }
         except Exception as e:
             errorMessage = f"Erro ao processar textos para busca de similares: {e}"

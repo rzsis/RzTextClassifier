@@ -198,16 +198,6 @@ class indexa_textos_classificarBll:
 
             except Exception as e:
                 print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
-
-
-        #self.gpu_utils.clear_gpu_cache()  # Limpeza final                                       
-        # # Insere no Qdrant em lotes menores e atualiza UpInsertOk
-        # insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
-        # for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
-        #     batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
-        #     batch_data = self._insert_text_list_qdrant(batch_data)
-        #     # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
-        #     self._mark_lista_as_indexado(batch_data)
         
         self.gpu_utils.clear_gpu_cache()
 
