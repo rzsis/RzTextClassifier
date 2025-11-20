@@ -324,7 +324,65 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             raise RuntimeError(f"Erro ao limpar ids similares iguais: {e}")
         
+    #caso o idBase não tenha mais registros na tabela sugestao_textos_classificar deve apagar o idBase da tabela textos_classificar
+    def _limpa_ids_base_sem_similares(self, idBase:int) -> None:
+        try:
+           # tentar bloquear classificar idsimilares em o base base classificado
+           # e aqui quando apagar verificar se só sobrou IdBase = IdBase tentar
 
+            #verifica se o idBase ainda tem registros na tabela sugestao_textos_classificar
+            query = f"SELECT COUNT(*) FROM sugestao_textos_classificar WHERE IdBase = :IdBase"
+            result = self.session.execute(text(query), {"IdBase": idBase}).scalar()
+            if (result or 0) == 0:
+                #se não tiver mais registros deve apagar o idBase da tabela textos_classificar
+                self._delete_texto_classificar(id=idBase)                
+                self.qdrant_utils.delete_id(collection_name=self.train_collection, id=idBase) #apaga do qdrant de treinamento                   
+                return
+                
+
+            # #verifica se o unico que sobrou como sugestão é ele mesmo ai pode apagar também
+            # query = f"SELECT COUNT(*) FROM sugestao_textos_classificar WHERE (IdBase = :IdBase) and (IdSimilar = :IdBase)"
+            # result = self.session.execute(text(query), {"IdBase": idBase}).scalar()
+            # if result == 1:
+            #     #se não tiver mais registros deve apagar o idBase da tabela textos_classificar
+            #     self._delete_texto_classificar(id=idBase)                
+            #     self.qdrant_utils.delete_id(collection_name=self.train_collection, id=idBase) #apaga do qdrant de treinamento                                   
+                
+        except Exception as e:
+            raise RuntimeError(f"Erro ao limpar idBase sem similares {idBase}: {e}")
+        
+    #caso não encontrar o TxtTreinamento na tabela textos_classificar deve copiar de textos_treinamento para poder seguir o fluxo
+    def _copia_texto_treinamento_para_textos_classificar(self, id:int) -> None:
+        try:                  
+            query = f"""
+                select *from textos_treinamento where id = :id
+            """
+            row = self.session.execute(text(query), {"id": id}).mappings().first()
+            if not row:
+                raise RuntimeError(f"Erro em _copia_TextoTreinamento_para_textos_classificar O ID {id} não foi encontrado na tabela textos_treinamento para copiar para textos_classificar.")
+            
+
+            agora = datetime.now()
+            query_insert = f"""
+                INSERT INTO textos_classificar
+                (id, DataEvento, Documento, CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
+                TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, Indexado, BuscouIgual, BuscouColidente,DataHoraInsert,DataHoraEdit)
+                SELECT id, DataEvento, Documento, :CodClasse, UF, TxtDocumento, TxtTreinamento, QtdPalavras,
+                    TipoDefinicaoInicioTxt, ProcessadoNulo, PalavraIni, 1, 0, 0, :DataHoraInsert, :DataHoraEdit
+                FROM textos_treinamento
+                WHERE id = :id
+                ON DUPLICATE KEY UPDATE
+                    CodClasse = VALUES(CodClasse),
+                    TxtTreinamento = VALUES(TxtTreinamento),
+                    TxtDocumento = VALUES(TxtDocumento)
+            """
+            self.session.execute(text(query_insert), {"id": id, "CodClasse": row["CodClasse"], "DataHoraInsert": agora, "DataHoraEdit": agora})
+            self._recreate_IdBase(id)
+            
+                              
+        except Exception as e:
+            raise RuntimeError(f"Erro ao mover para textos_treinamento: {e}")
+          
     #Main method to move suggested training texts based on similarity and class.
     #CodUser vem da interface do usuario
     #mover_com_colidencia serve para ignorar a verificação de colisão de classes caso o usuario queira forçar a movimentação
@@ -333,6 +391,10 @@ class move_sugestao_treinamentoBLL:
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
                 raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
             
+            ##arrumar isso aqui pois tem que ver quando ele não encontrar chamar minha api para restaurar
+            #self._copia_texto_treinamento_para_textos_classificar(idBase)
+             #   if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)): #verifica novamente
+
             #Bloco que procura o colidencias com idBase
             result = self._check_coliding_idBase(idBase=idBase,codClasse=codClasse,mover_com_colidencia=mover_com_colidencia)
             if (result is not None):
@@ -357,15 +419,17 @@ class move_sugestao_treinamentoBLL:
 
             #deve apagar os registros duplicados da tabela sugestao_textos_classificar
             for item in lista_iguais:
-                self._delete_sugestao_textos_classificar(idBase=idBase, idSimilar=item)
-                self._delete_texto_classificar(id=item)
+                if (item != idBase):#não deve apagar o idBase pois pode ter outros similares para ele
+                    self._delete_sugestao_textos_classificar(idBase=idBase, idSimilar=item)
+                    self._delete_texto_classificar(id=item)
             
             #apaga os registros similares da tabela sugestao_textos_classificar
             for item in lista_similares:
                 self._delete_sugestao_textos_classificar(idBase=idBase, idSimilar=item)       
                 self._delete_texto_classificar(id=item) 
 
-            self._limpa_ids_similares_iguais(lista_similares)               
+            self._limpa_ids_similares_iguais(lista_similares)
+            self._limpa_ids_base_sem_similares(idBase=idBase)
 
             #grava as mudanças no banco de dados MariaDb idéia é que tudo seja feito numa transação só
             self.session.commit()
