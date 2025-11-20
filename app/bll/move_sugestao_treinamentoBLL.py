@@ -382,7 +382,22 @@ class move_sugestao_treinamentoBLL:
                               
         except Exception as e:
             raise RuntimeError(f"Erro ao mover para textos_treinamento: {e}")
-          
+    
+    #verifica se o idBase existe na tabela textos_treinamento e no qdrantfinal pois primeiro deve ser classificado o IdBase = IdBase
+    def _check_idBase_in_textos_treinamento(self, idBase:int) -> None:
+        try:
+            query = f"SELECT COUNT(*) FROM textos_treinamento WHERE id = :idBase"
+            result = self.session.execute(text(query), {"idBase": idBase}).scalar()
+            if (result or 0) == 0:
+                raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na tabela textos_treinamento !\n Você deve primeiro informar o IdPrincipal para depois classificar os similares.") 
+            
+            if (self.qdrant_utils.get_id(id=idBase, collection_name=self.final_collection) == None):
+                raise RuntimeError(f"Erro: O IdBase {idBase} não foi encontrado na coleção final!\n Você deve primeiro informar o IdPrincipal para depois classificar os similares.")
+
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ao verificar idBase em textos_treinamento: {e}")        
+
     #Main method to move suggested training texts based on similarity and class.
     #CodUser vem da interface do usuario
     #mover_com_colidencia serve para ignorar a verificação de colisão de classes caso o usuario queira forçar a movimentação
@@ -394,6 +409,9 @@ class move_sugestao_treinamentoBLL:
             ##arrumar isso aqui pois tem que ver quando ele não encontrar chamar minha api para restaurar
             #self._copia_texto_treinamento_para_textos_classificar(idBase)
              #   if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)): #verifica novamente
+
+            if (idBase != idSimilar):#faz isso para verificar se ja foi classificado o IdBase Principal
+                self._check_idBase_in_textos_treinamento(idBase)
 
             #Bloco que procura o colidencias com idBase
             result = self._check_coliding_idBase(idBase=idBase,codClasse=codClasse,mover_com_colidencia=mover_com_colidencia)
@@ -445,7 +463,7 @@ class move_sugestao_treinamentoBLL:
 
         except Exception as e:
             self.session.rollback()
-            errorMessage = f"Erro ao mover sugestões para treinamento: {e}"
+            errorMessage = f"Erro! ao mover sugestões para treinamento:\n {e}"
             print_with_time(errorMessage)
             return {
                 "status": "ERROR",

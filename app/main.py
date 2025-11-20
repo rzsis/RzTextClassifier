@@ -45,6 +45,7 @@ gpu_utilsModule().print_gpu_info()
 if __name__ == "__main__":
     import uvicorn
     HTTP_PORT = int(localconfig.get("http_port"))
+    workers = int(localconfig.get("workers"))
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
     
     uvicorn.run(
@@ -52,5 +53,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=HTTP_PORT,
         log_level="info",
-        workers=5,
+        workers=workers,
     )
