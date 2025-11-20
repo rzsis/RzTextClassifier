@@ -116,7 +116,7 @@ class indexa_textos_classificarBll:
     def _insert_text_list_qdrant(self, processed_data: list[dict]) -> list[dict]:
         try:
             points = []
-            for item in tqdm(processed_data, desc="Inserindo dados no Qdrant"):
+            for item in processed_data:
                 payload={        
                     "Id":  item['Id'],
                     "Classe": item.get('Classe') or None,
@@ -139,11 +139,11 @@ class indexa_textos_classificarBll:
             if result.status == "completed":
                 for item in processed_data:
                     item['UpInsertOk'] = True
-                self.logger.info(f"Inseridos {len(processed_data)} textos no Qdrant com sucesso.")
+              #  self.logger.info(f"Inseridos {len(processed_data)} textos no Qdrant com sucesso.")
             else:
                 for item in processed_data:
                     item['UpInsertOk'] = False
-                self.logger.error(f"Falha ao inserir textos no Qdrant: status {result.status}")
+                print_with_time(f"Falha ao inserir textos no Qdrant: status {result.status}")
             
             return processed_data
         except Exception as e:
@@ -170,7 +170,7 @@ class indexa_textos_classificarBll:
 
         # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
         processed_data = []
-        batch_size = 32  # Ajuste conforme a capacidade da sua GPU (ex: 16, 32, 64)
+        batch_size = 200  #Ajustado para a 5070 ti 16gb com float16
 
         for i in tqdm(range(0, len(data), batch_size), desc="Gerando embeddings em batches"):
             batch = data[i:i + batch_size]
@@ -187,22 +187,27 @@ class indexa_textos_classificarBll:
                         'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
                     })
                 
-                # Clear cache a cada batch processado (ajuste a frequência se necessário)
-                self.gpu_utils.clear_gpu_cache()
-            
+              
+                self.gpu_utils.clear_gpu_cache() # Clear cache a cada batch 
+                        
+                processed_data = self._insert_text_list_qdrant(processed_data)
+               
+                self._mark_lista_as_indexado(processed_data) # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
+
+                processed_data = []  # Reseta a lista após o processamento do batch
+
             except Exception as e:
-                self.logger.error(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
+                print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
 
-        self.gpu_utils.clear_gpu_cache()  # Limpeza final
-                                       
 
-        # Insere no Qdrant em lotes menores e atualiza UpInsertOk
-        insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
-        for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
-            batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
-            batch_data = self._insert_text_list_qdrant(batch_data)
-            # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
-            self._mark_lista_as_indexado(batch_data)
+        #self.gpu_utils.clear_gpu_cache()  # Limpeza final                                       
+        # # Insere no Qdrant em lotes menores e atualiza UpInsertOk
+        # insert_qDrant_Batch_Size = 200  # Define o tamanho do lote
+        # for i in tqdm(range(0, len(processed_data), insert_qDrant_Batch_Size), desc="Processando lotes no Qdrant"):
+        #     batch_data = processed_data[i:i + insert_qDrant_Batch_Size]
+        #     batch_data = self._insert_text_list_qdrant(batch_data)
+        #     # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
+        #     self._mark_lista_as_indexado(batch_data)
         
         self.gpu_utils.clear_gpu_cache()
 

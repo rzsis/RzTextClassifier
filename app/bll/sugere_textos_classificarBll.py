@@ -172,7 +172,7 @@ class sugere_textos_classificarBll:
             qtd_inserido_similares = 0
             qtd_inserido = 0
             for item in tqdm(data,"Processando textos duplicados"):
-                already_exists = (item['IdBase'] in self.lista_sugestao_textos_classificar)
+                already_exists = (item['IdBase'] in self.lista_sugestao_textos_classificar) or (item["IdSimilar"] in self.lista_sugestao_textos_classificar)
                 if already_exists:
                     continue
                                     
@@ -180,7 +180,7 @@ class sugere_textos_classificarBll:
                 lista_marcar_duplicados.append({"id":item["IdBase"]})            
                 
                 lista_insercao_duplicados = []
-                for item_duplicado in item["IdsIguais"]:
+                for item_duplicado in item["IdsIguais"]:                    
                     lista_marcar_duplicados.append({"id":item_duplicado})
                     lista_insercao_duplicados.append({
                             "IdEncontrado": item_duplicado,
