@@ -472,8 +472,7 @@ class sugere_textos_classificarBll:
                     NivelBuscaSimilaridade = COALESCE(NivelBuscaSimilaridade, 0) + 1
                 WHERE id IN :ids;
             """
-            self.session.execute(text(query), {"ids": tuple(ids_to_update)})
-            self.session.commit()            
+            self.session.execute(text(query), {"ids": tuple(ids_to_update)})        
         except Exception as e:
             print_with_time(f"Erro ao marcar textos como buscou similar em lote: {e}")
             self.session.rollback()            
@@ -523,7 +522,6 @@ class sugere_textos_classificarBll:
                 or stc.DataEvento is null                 
             """
             self.session.execute(text(query))
-            self.session.commit()
         except Exception as e:
             print_with_time(f"Erro em _update_textos_classificar: {e}")
             self.session.rollback()
@@ -567,6 +565,7 @@ class sugere_textos_classificarBll:
             self._inc_nivel_similaridade(data)
             self.gpu_utils.clear_gpu_cache()
             self._update_textos_classificar()
+            self.session.commit()
             tempo_decorrido_min = (time.time() - inicio) / 60          
             sucessMessage = f"Inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
             itens_restantes = self._get_qtd_textos_falta_buscar_similar()
