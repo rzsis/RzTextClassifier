@@ -31,8 +31,7 @@ class indexa_textos_classificarBll:
             from main import localconfig as localcfg
             self.session = session
             self.localconfig = localcfg
-            self.config = localcfg.read_config()
-            self.textos_classificar_collection_name = f"v{localcfg.get('codcli')}_textos_classificar"
+            self.config = localcfg.read_config()            
             self.limite_similares = 20
             self.similarity_threshold = 0.95
             self.min_similars = 3
@@ -41,6 +40,7 @@ class indexa_textos_classificarBll:
             embeddingsBllModule.initBllEmbeddings(self.session)
             self.qdrant_utils = Qdrant_UtilsModule()
             self.qdrant_client = self.qdrant_utils.get_client()
+            self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train")
             self.qdrant_utils.create_collection(self.textos_classificar_collection_name)
             self.classifica_textoBll = classifica_textoBllModule(embeddingsModule=embeddingsBllModule.bllEmbeddings, session=session)
             self.log_ClassificacaoBll = LogClassificacaoBllModule(session)
@@ -170,7 +170,7 @@ class indexa_textos_classificarBll:
 
         # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
         processed_data = []
-        batch_size = 200  #Ajustado para a 5070 ti 16gb com float16
+        batch_size = 100  #Ajustado para a 5070 ti 16gb com float16
 
         for i in tqdm(range(0, len(data), batch_size), desc="Gerando embeddings em batches"):
             batch = data[i:i + batch_size]
@@ -200,6 +200,8 @@ class indexa_textos_classificarBll:
                 print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
         
         self.gpu_utils.clear_gpu_cache()
+
+        self.qdrant_utils.force_reindex(self.textos_classificar_collection_name)
 
         tempo_decorrido_min = (time.time() - inicio) / 60
         sucessMessage = f"Indexados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes no Qdrant, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"

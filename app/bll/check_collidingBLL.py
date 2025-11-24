@@ -56,7 +56,7 @@ class check_collidingBLL:
             similarity_list = self.qdrant_utils.search_embedding(
                 embedding=query_embedding,
                 collection_name=self.final_collection,
-                limite_itens=20,
+                itens_limit=20,
                 similarity_threshold=self.min_similarity                                          
                 )
 

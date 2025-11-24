@@ -1,6 +1,7 @@
 # qdrant_utils.py
 from ast import Dict
-from typing import Any, Optional
+from socket import timeout
+from typing import Any, List, Optional
 import venv
 from xmlrpc.client import boolean
 from aiohttp import Payload
@@ -8,13 +9,14 @@ import numpy as np
 from pymysql import connect
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue,MatchExcept, MatchAny
 from sympy import false, true
 from common import print_with_time, print_error, get_localconfig
 import re
 import requests
 from importlib.metadata import version as pkg_version
 from qdrant_client.http.exceptions import UnexpectedResponse
+import time
 
 class Qdrant_Utils:
     def __init__(self):
@@ -24,6 +26,8 @@ class Qdrant_Utils:
         self._qdrant_client = None
         self.collectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
         self._connect_qDrant()
+        self._old_exclusion_list = []  # Cache para lista de exclusão antiga
+        self._oldFilter = None
 
     def _connect_qDrant(self) -> bool:
         try:
@@ -67,13 +71,31 @@ class Qdrant_Utils:
             return f"v{codcli}_textos_classificar"
         else:
             raise RuntimeError(f"get_collection_name só suporta 'final' ou 'train', recebeu: {collection_type}")
-    
+        
+    ##Fecha a conexão com o Qdrant.
     def dispose(self):
-        """Fecha a conexão com o Qdrant."""
         if self._qdrant_client is not None:
             self._qdrant_client.close()  # Use close() instead of dispose()
             self._qdrant_client = None
 
+    #para evitar tentar ganhar perfomance e não montar a lista de exclusão toda hora
+    def _get_exclusion_list(self, exclusion_list: List[int]) -> Filter:
+        if (exclusion_list) and (exclusion_list != self._old_exclusion_list):
+            self._old_exclusion_list  = exclusion_list            
+            self._oldFilter = Filter(
+                must_not=[
+                    FieldCondition(
+                        key="id",
+                        match=MatchAny(any=exclusion_list)
+                    )
+                ]
+            )
+            return self._oldFilter
+        else:   
+            return self._oldFilter       # type: ignore
+            
+    
+    #Cria a coleção no Qdrant se não existir
     def create_collection(self, pCollection_name: str):
         try:
             # Verifica se a coleção existe senão cria
@@ -91,21 +113,83 @@ class Qdrant_Utils:
         except Exception as e:
             raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
 
+    #Força o Qdrant a reindexar a coleção imediatamente.
+    #Ele compacta segmentos e recria índices HNSW se necessário.
+    def force_reindex(self, collection_name: str) -> bool:   
+        try:
+            # 1. Verifica status atual
+            timeout = 300
+            info = self._qdrant_client.get_collection(collection_name)
+            total_points = info.points_count or 0
+            indexed_points = info.indexed_vectors_count or 0
+            
+            if indexed_points >= total_points:            
+                return True
+
+            print_with_time(f"Forçando reindexação: {indexed_points}/{total_points} vetores indexados.")
+
+            # 2. Define threshold = 0 (acumula tudo sem indexar imediatamente)
+            self._qdrant_client.update_collection(
+                collection_name=collection_name,
+                optimizer_config={
+                    "indexing_threshold": 0
+                }
+            )
+
+            # 3. Volta o threshold para um valor baixo → força criação do índice
+            self._qdrant_client.update_collection(
+                collection_name=collection_name,
+                optimizer_config={
+                    "indexing_threshold": 10000  # valor pequeno o suficiente para disparar imediatamente
+                }
+            )
+
+            start_time = time.time()
+            
+            while True:
+                if time.time() - start_time > timeout:
+                    print_with_time("\nTimeout atingido ao aguardar indexação.")
+                    return False
+
+                current = self._qdrant_client.get_collection(collection_name)
+                indexed = current.indexed_vectors_count or 0
+                total = current.points_count or 0
+
+                if indexed >= total and current.status == "green":
+                    print_with_time(f"\nIndexação concluída! {indexed}/{total} vetores indexados.")
+                    return True
+              
+                time.sleep(2)
+
+        except Exception as e:
+            print_with_time(f"\nErro ao forçar reindexação: {e}")
+            return False
+
+
     # Busca embeddings similares no qdrant
+    #exclusion_list é uma lista de Ids que devem ser excluidos da busca de similaridade pois não faz sentido eu procurar os proprios ids como similares deles mesmos
     def search_embedding(self, 
                          embedding: np.ndarray,
                          collection_name: str,
-                         limite_itens: int,
-                         similarity_threshold: float) -> list[dict]:
+                         itens_limit: int,
+                         similarity_threshold: float,
+                         exclusion_list: List[int]) -> list[dict]:
         try: 
             high_similars = []         
-            embedding = np.array(embedding, dtype=float)                                    
+            embedding = np.array(embedding, dtype=float)  
+
+            # Criar filtro de exclusão de IDs
+            search_filter = self._get_exclusion_list(exclusion_list)            
+
             search_results = self._qdrant_client.search(
                 collection_name=collection_name,
                 query_vector=embedding.flatten().tolist(),
-                limit=limite_itens,
-                score_threshold=similarity_threshold
+                limit=itens_limit,
+                score_threshold=similarity_threshold,
+                query_filter=search_filter 
             )
+
+
             high_similars = [
                 {
                     "IdEncontrado": int(res.id),  

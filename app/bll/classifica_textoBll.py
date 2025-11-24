@@ -56,19 +56,23 @@ class classifica_textoBll:
 
         return max_sim_item["IdEncontrado"] if max_sim_item else None                 
 
-    def check_embedding_colliding(self, 
+    #obtem a lista de similaridades a partir do embedding de consulta e retorna um resultado estruturado
+    #exclusion_list é uma lista de Ids que devem ser excluidos da busca de similaridade pois não faz sentido eu procurar os proprios ids como similares deles mesmos
+    def get_similarity_list(self, 
                                 query_embedding: np.ndarray, 
                                 collection_name: str,
                                 id_a_classificar:Optional[int] = None, 
                                 TabelaOrigem:Optional[str] = "", 
                                 itens_limit: int = 20,
                                 gravar_log = False,
-                                min_similarity:int = 0.8) -> 'classifica_textoBll.ResultadoSimilaridade':                
+                                min_similarity:int = 0.8,
+                                exclusion_list: List[int] = []) -> 'classifica_textoBll.ResultadoSimilaridade':                
         try:
-            results = self.qdrant_utils.search_embedding(query_embedding,
-                                                         collection_name,
-                                                         itens_limit,
-                                                         min_similarity)
+            results = self.qdrant_utils.search_embedding(embedding= query_embedding,
+                                                         collection_name= collection_name,
+                                                         itens_limit= itens_limit,
+                                                         similarity_threshold= min_similarity,
+                                                         exclusion_list = exclusion_list)
                     
             if not results:
                 return self.ResultadoSimilaridade(
@@ -104,7 +108,7 @@ class classifica_textoBll:
                 if max_sim_por_classe[cod_classe] is None or result["Similaridade"] > max_sim_por_classe[cod_classe]["Similaridade"]: # pyright: ignore[reportOptionalSubscript]
                     max_sim_por_classe[cod_classe] = result
 
-            # Calculate averages
+            # Calcula médias
             medias = {cod_classe: sum(sims) / len(sims) for cod_classe, sims in medias_por_classe.items()}
             classe_maior_media = max(medias.items(), key=lambda x: x[1], default=(None, 0.0))[0]            
 
@@ -186,12 +190,13 @@ class classifica_textoBll:
             # Generate embedding for the input text to compare in future
             query_embedding = self.embeddingsModule.generate_embedding(texto,id_a_classificar)
                        
-            return self.check_embedding_colliding(query_embedding=query_embedding,                                            
+            return self.get_similarity_list(query_embedding=query_embedding,                                            
                                             collection_name=self.collection_name,
                                             id_a_classificar=id_a_classificar , 
                                             TabelaOrigem=TabelaOrigem, 
                                             itens_limit=limite_itens,
-                                            gravar_log=gravar_log)
+                                            gravar_log=gravar_log,
+                                            exclusion_list= [])
         
         except Exception as e:
             raise RuntimeError(f"Erro ao classificar texto: {e}")

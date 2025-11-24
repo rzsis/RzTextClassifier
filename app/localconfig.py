@@ -36,7 +36,7 @@ def checkRequiredKeys():
         "max_length", #tamanho máximo do texto para gerar o embedding
         "vectordatabasehost", #endereço do banco qdrant
         "codcli", ##codigo do cliente na base de dados
-        "text_limit_per_batch" # Limite de textos por lote para classificação
+        "text_limit_per_batch", # Limite de textos por lote para classificação
         "workers" # Número de workers para o servidor HTTP
     ]
 

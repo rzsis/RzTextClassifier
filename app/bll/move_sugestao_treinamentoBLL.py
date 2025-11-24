@@ -9,6 +9,7 @@ from pkg_resources import UnknownExtra
 from sklearn.covariance import empirical_covariance
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
+from sympy import Id
 from torch import embedding
 from common import print_with_time, print_error
 import logger
@@ -398,6 +399,32 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             raise RuntimeError(f"Erro ao verificar idBase em textos_treinamento: {e}")        
 
+    #Atualiza o campo ja classificado em sugestao_textos_classificar isso deve ser feito quando idbase = idbase para sinalizar para a interface
+    # que o IdBase principal ja foi atualizado    
+    def _update_ja_classificado_idbase(self, idBase:int):
+        try:
+            #atualiza o IbBase como ja classificado
+            self.session.execute(text("Update sugestao_textos_classificar set JaClassificado = 1 where IdBase = :idBase"),{"idBase": idBase})
+        except Exception as e:
+            raise RuntimeError(f"Erro ao verificar idBase em _update_ja_classificado_idbase: {e}") 
+
+    #Apaga o idBase da tabela sugestao_textos_classificar caso ele não tenha mais registros relacionados
+    def _apaga_idbase_orfao(self, idBase:int):
+        try:        
+            #verifica se só tem o IdBase na tabela sugestao_textos_classificar para apagar o registro             
+            query = text(f"""DELETE FROM sugestao_textos_classificar
+                        WHERE IdBase = :idBase
+                            AND (
+                                SELECT COUNT(*)
+                                FROM sugestao_textos_classificar
+                                WHERE IdBase = :idBase        
+                            ) = 1
+                         """)
+                 
+            self.session.execute(query,{"idBase":idBase})
+        except Exception as e:
+            raise RuntimeError(f"Erro ao apagar idBase órfão em _apaga_idbase_orfao: {e}")
+
     #Main method to move suggested training texts based on similarity and class.
     #CodUser vem da interface do usuario
     #mover_com_colidencia serve para ignorar a verificação de colisão de classes caso o usuario queira forçar a movimentação
@@ -435,6 +462,9 @@ class move_sugestao_treinamentoBLL:
             #Agora insere toda a lista de similares para o qdrant final e textos_treinamento
             self._insert_ids_to_qdrant_final(lista_similares, CodClasse=codClasse, Classe=classe, coduser=coduser)
 
+            if (idBase == idSimilar):#caso for igual atualiza o ja classificado para a interface saber 
+                self._update_ja_classificado_idbase(idBase)
+
             #deve apagar os registros duplicados da tabela sugestao_textos_classificar
             for item in lista_iguais:
                 if (item != idBase):#não deve apagar o idBase pois pode ter outros similares para ele
@@ -449,8 +479,9 @@ class move_sugestao_treinamentoBLL:
             self._limpa_ids_similares_iguais(lista_similares)
             self._limpa_ids_base_sem_similares(idBase=idBase)
 
-            #grava as mudanças no banco de dados MariaDb idéia é que tudo seja feito numa transação só
-            self.session.commit()
+            self._apaga_idbase_orfao(idBase)#apaga o idBase da tabela sugestao_textos_classificar caso ele não tenha mais registros relacionados
+            
+            self.session.commit()#grava as mudanças no banco de dados MariaDb idéia é que tudo seja feito numa transação só
 
             total_movido = len(lista_iguais) + len(lista_similares)
             sucessMessage = f"Movidos {total_movido} registros para treinamento e Qdrant final"

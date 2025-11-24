@@ -17,6 +17,7 @@ router = APIRouter()
 @router.post("/edit_texto_treinamento")
 async def edit_texto_treinamento(id: int,
                               codClasse: int,
+                              codUser:int,
                               session: Session = Depends(get_session_db)  ):
     try:
         edit_textosTreinamentoBll = edit_textosTreinamentoBLLModule(session)

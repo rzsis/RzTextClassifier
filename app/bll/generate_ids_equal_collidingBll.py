@@ -79,10 +79,10 @@ class GenerateIdsIguaisCollindgs:
         except Exception as e:
             raise RuntimeError(f"Erro executando consulta no banco de dados: {e}")
         
-
+    #Process a dataset to find colliding items (high similarity, different classes) and save to database.
     def _genetare_ids_colliding(self) -> str:
         """
-        Process a dataset to find colliding items (high similarity, different classes) and save to database.
+        
         """
         similarity_threshold_colliding = 0.95
         # Load data from database
@@ -112,14 +112,15 @@ class GenerateIdsIguaisCollindgs:
             
             # Busca texto similares usando classifica_textoBll
             try:
-                result = self.classifica_texto.check_embedding_colliding(
+                result = self.classifica_texto.get_similarity_list(
                     query_embedding=query_embedding,
                     collection_name=self.collection_name,
                     id_a_classificar=id_tram,
                     TabelaOrigem="textos_treinamento",
                     itens_limit=self.itens_limit,
                     gravar_log=False,
-                    min_similarity=similarity_threshold_colliding
+                    min_similarity=similarity_threshold_colliding,
+                    exclusion_list= []
                 )
                 results = result.ListaSimilaridade or []
             except Exception as e:
@@ -220,13 +221,15 @@ class GenerateIdsIguaisCollindgs:
             
             # Perform similarity search using classifica_textoBll
             try:
-                result = self.classifica_texto.check_embedding_colliding(
+                result = self.classifica_texto.get_similarity_list(
                     collection_name=self.collection_name,
                     query_embedding=query_embedding,
                     id_a_classificar=id_tram,
                     TabelaOrigem="textos_treinamento",
                     itens_limit=self.itens_limit,
-                    gravar_log=False
+                    gravar_log=False,
+                    min_similarity= 0.985,
+                    exclusion_list= []
                 )
                 results = result.ListaSimilaridade or []
             except Exception as e:
