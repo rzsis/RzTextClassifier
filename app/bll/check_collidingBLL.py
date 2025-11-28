@@ -57,8 +57,8 @@ class check_collidingBLL:
                 embedding=query_embedding,
                 collection_name=self.final_collection,
                 itens_limit=20,
-                similarity_threshold=self.min_similarity                                          
-                )
+                similarity_threshold=self.min_similarity,                                      
+                exclusion_list=[])
 
         except Exception as e:
             raise RuntimeError(f"Erro em check_colliding_by_embedding: {e}")

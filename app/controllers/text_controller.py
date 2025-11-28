@@ -15,6 +15,7 @@ from bll.classifica_textos_pendentesBll import ClassificaTextosPendentesBll as c
 from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBllModule
 from bll.move_sugestao_treinamentoBLL import move_sugestao_treinamentoBLL as move_sugestao_treinamentoBllModule
 from bll.indexa_textos_classificarBll import indexa_textos_classificarBll as indexa_textos_classificarBllModule
+from bll.busca_textoBLL import busca_textoBLL as busca_textoBLLModule
 
 router = APIRouter()
    
@@ -97,3 +98,28 @@ async def move_sugestao_treinamento(idbase:int,
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
+    
+
+#endpoint para buscar textos treinamento
+@router.post("/busca_textos")
+async def busca_textos( id:int,#passar 0 se não quiser filtrar por id
+                        codclasse:int,#passar 0 se não quiser filtrar por codclasse
+                        texto:str,#obrigatório
+                        data_inicial:str ,#passar "" se não quiser filtrar por data_inicial
+                        data_final:str ,#passar "" se não quiser filtrar por data_final
+                        similaridade_minima:float,#passar 0 se não quiser filtrar por similaridade mínima valor deve estar entre 0 e 1
+                        collection_name:str,#obrigatório final ou train define se vai buscar na coleção ja treinada ou de textos a classificar
+                        session: Session = Depends(get_session_db)  ):        
+
+    try:             
+        busca_textoBLL = busca_textoBLLModule(embeddingsBllModule.get_bllEmbeddings(),session)
+        return busca_textoBLL.busca_texto(id=id,
+                                          codclasse=codclasse,
+                                          texto=texto,
+                                          data_inicial=data_inicial,
+                                          data_final=data_final,
+                                          similaridade_minima=similaridade_minima,
+                                          collection_name=collection_name)
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em busca_textos : {str(e)}")    

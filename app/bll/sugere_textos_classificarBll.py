@@ -512,6 +512,7 @@ class sugere_textos_classificarBll:
     #faz somente aqui pois pegar essa informação na hora da consulta é muito custoso
     def _update_textos_classificar(self):
         try:
+            #atualiza data de evento e quantidade de palavras na tabela sugestao_textos_classificar
             query = """
               Update sugestao_textos_classificar stc 
                 inner join textos_classificar tc on tc.id  = stc.IdSimilar 
@@ -521,6 +522,19 @@ class sugere_textos_classificarBll:
                 stc.QtdPalavras is null or stc.QtdPalavras = 0
                 or stc.DataEvento is null                 
             """
+            self.session.execute(text(query))
+
+            #atualiza a quantidade de similares encontrados para cada IdBase para o Id com mais semelhanças ficar no topo e não sumir do nada
+            query = """
+                UPDATE sugestao_textos_classificar AS stc
+                JOIN (
+                    SELECT IdBase, COUNT(*) AS Qtd
+                    FROM sugestao_textos_classificar
+                    GROUP BY IdBase
+                ) AS agg ON stc.IdBase = agg.IdBase
+                SET stc.QtdSimilares = agg.Qtd;
+            """
+
             self.session.execute(text(query))
         except Exception as e:
             print_with_time(f"Erro em _update_textos_classificar: {e}")

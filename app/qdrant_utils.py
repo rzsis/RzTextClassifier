@@ -1,7 +1,10 @@
 # qdrant_utils.py
 from ast import Dict
+from datetime import date
+import datetime
 from socket import timeout
 from typing import Any, List, Optional
+from typing_extensions import runtime
 import venv
 from xmlrpc.client import boolean
 from aiohttp import Payload
@@ -10,7 +13,7 @@ from pymysql import connect
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue,MatchExcept, MatchAny
-from sympy import false, true
+from sympy import Range, false, true
 from common import print_with_time, print_error, get_localconfig
 import re
 import requests
@@ -167,7 +170,7 @@ class Qdrant_Utils:
 
 
     # Busca embeddings similares no qdrant
-    #exclusion_list é uma lista de Ids que devem ser excluidos da busca de similaridade pois não faz sentido eu procurar os proprios ids como similares deles mesmos
+    # exclusion_list é uma lista de Ids que devem ser excluidos da busca de similaridade pois não faz sentido eu procurar os proprios ids como similares deles mesmos
     def search_embedding(self, 
                          embedding: np.ndarray,
                          collection_name: str,
@@ -207,6 +210,104 @@ class Qdrant_Utils:
             print_with_time(f"Erro ao buscar similares no Qdrant {e}")
             return []
         
+    def search_embedding_and_metaData(self,
+                                  embedding: np.ndarray,
+                                  collection_name: str,
+                                  itens_limit: int,
+                                  similarity_threshold: float,
+                                  id: int,
+                                  codclasse: int,
+                                  data_inicial: str,
+                                  data_final: str) -> list[dict]:
+        try:
+            high_similars = []
+            embedding = np.array(embedding, dtype=float)
+
+            similarity_threshold = similarity_threshold / 100
+            # ------------------- Construção do filtro -------------------
+            filter_clauses = []
+
+            # 1. Filtro por Id (só aplica se id > 0)
+            if id > 0:
+                filter_clauses.append(
+                    FieldCondition(
+                        key="Id",
+                        match=MatchValue(value=id)
+                    )
+                )
+
+            # 2. Filtro por CodClasse (só aplica se codclasse > 0)
+            if codclasse > 0:
+                filter_clauses.append(
+                    FieldCondition(
+                        key="CodClasse",
+                        match=MatchValue(value=codclasse)
+                    )
+                )                   
+
+            # 4. Filtro por range de DataEvento (formato DD-MM-YYYY)
+            if data_inicial or data_final:
+                raise RuntimeError("A data inicial e final devem ser fornecidas juntas para o filtro de data.")
+            
+
+            if data_inicial and data_final:
+                range_filter = datetime.Range()
+                if data_inicial:
+                    # Converte string DD-MM-YYYY para datetime para garantir ordenação correta
+                    try:
+                        dt_inicio = datetime.strptime(data_inicial, "%d-%m-%Y")
+                        range_filter.gte = dt_inicio.timestamp()   # Qdrant aceita timestamp float
+                    except ValueError:
+                        print_with_time(f"Formato inválido para data_inicial: {data_inicial}")
+                        return []
+                
+                if data_final:
+                    try:
+                        dt_fim = datetime.strptime(data_final, "%d-%m-%Y")
+                        range_filter.lte = dt_fim.timestamp()
+                    except ValueError:
+                        print_with_time(f"Formato inválido para data_final: {data_final}")
+                        return []
+
+                filter_clauses.append(
+                    FieldCondition(
+                        key="DataEvento",   # precisa estar armazenado como timestamp float no payload
+                        range=range_filter
+                    )
+                )
+
+            # Monta o filtro final (AND entre todas as condições)
+            if filter_clauses:
+                query_filter = Filter(must=filter_clauses)  
+            else:
+                query_filter = None
+
+            # ------------------- Busca no Qdrant -------------------
+            search_results = self._qdrant_client.search(
+                collection_name=collection_name,
+                query_vector=embedding.flatten().tolist(),
+                limit=itens_limit,
+                score_threshold=similarity_threshold,
+                query_filter=query_filter
+            )
+
+            high_similars = [
+                {
+                    "IdEncontrado": int(res.id),
+                    "Similaridade": res.score,
+                    "Classe": (res.payload or {}).get("Classe"),
+                    "CodClasse": (res.payload or {}).get("CodClasse")                    
+                }
+                for res in search_results
+            ]
+
+            return high_similars
+
+        except Exception as e:
+            print_with_time(f"Erro ao buscar similares no Qdrant: {e}")
+            return []
+
+
     def get_id(self, id: int, collection_name: str) -> Optional[dict[str, Any]]:
         try:
             records = self._qdrant_client.retrieve(
@@ -279,10 +380,13 @@ class Qdrant_Utils:
             if len(embeddings) != self.collectionSize:
                 raise RuntimeError(f"Embeddings para o ID {id} na coleção {collection_name} tem tamanho {len(embeddings)}, esperado {self.collectionSize}")
 
+            #monta o payload
+            dataevento = date.today()
             payload={        
                     "Id": id,
                     "Classe": classe,
-                    "CodClasse": codclasse                        
+                    "CodClasse": codclasse,
+                    "DataEvento": dataevento.strftime("%d-%m-%Y")                        
                     }
 
             self._qdrant_client.upsert(

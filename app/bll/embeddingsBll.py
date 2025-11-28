@@ -21,6 +21,7 @@ def initBllEmbeddings(session=Session):
             bllEmbeddings.load_model_and_tokenizer()
         except Exception as e:
             raise RuntimeError(f"Erro Inicializando bllEmbeddings: {e}")
+        
 def get_bllEmbeddings(session=Session):
     if bllEmbeddings is None:
         initBllEmbeddings(session)
