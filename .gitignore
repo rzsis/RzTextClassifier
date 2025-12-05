@@ -8,6 +8,7 @@ app/bll/__pycache__/embeddings.cpython-311.pyc
 __pycache__/
 embeddingsTrain/
 embeddingsFinal/
+data/
 
 # Ignora todos os arquivos compilados Python
 __pycache__/

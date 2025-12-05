@@ -1,7 +1,7 @@
 # main.py
 import os
 
-from controllers import edit_text_contoller
+from controllers import edit_text_contoller, finetuning_contoller
 #Necessario colocar ja inicio para pegar antes de importar torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
 os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
@@ -37,6 +37,7 @@ fastApi.include_router(text_controller.router)
 fastApi.include_router(index_controller.router)
 fastApi.include_router(embeddings_generate_controller.router)
 fastApi.include_router(edit_text_contoller.router)
+fastApi.include_router(finetuning_contoller.router)
 
 common._db.test_connection()
 
