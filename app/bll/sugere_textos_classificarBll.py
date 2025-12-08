@@ -214,7 +214,7 @@ class sugere_textos_classificarBll:
                 if lista_similares != None:
                     qtd_inserido_similares += len(lista_similares)
                     for similar in lista_similares:
-                        lista_marcar_duplicados.append({"id":similar['Id']}) 
+                        lista_marcar_duplicados.append({"id":similar['IdEncontrado']}) 
 
                     self._mark_as_buscou_igual(lista_marcar_duplicados)
                     self.session.commit()

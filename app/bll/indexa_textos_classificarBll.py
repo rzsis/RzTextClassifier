@@ -20,13 +20,14 @@ from collections.abc import Sequence
 import torch
 import time
 
+### Para Reindexar os textos_classificar , executar o comando abaixo no banco de dados:
+# 1º Update textos_classificar t set t.Indexado = False, t.NivelBuscaSimilaridade = 0,t.BuscouIgual = False
+# Se fazer tudo denovo é mais facil limpar os bancos no qdrant
+# apagar as sugestões de textos a classificar com delete from sugestao_textos_classificar;
+####
 class indexa_textos_classificarBll:
-    def __init__(self, session: Session):
-        """
-        Inicializa a classe para indexação e detecção de textos similares usando Qdrant.
-        Args:
-            session (Session): Sessão SQLAlchemy para operações no banco.
-        """
+    #Inicializa a classe para indexação e detecção de textos similares usando Qdrant.
+    def __init__(self, session: Session):        
         try:
             from main import localconfig as localcfg
             self.session = session

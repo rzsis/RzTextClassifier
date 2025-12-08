@@ -41,22 +41,24 @@ class DAPT_bge_m3:
 
         query = f"""
                 (
-                    select tc.TxtTreinamento,tc.QtdPalavras 
+                    select tc.TxtTreinamento,tc.QtdPalavras,min(tc.id) as id
                     from textos_classificar tc
                     where 
-                    ( tc.id in (select stc.idbase from sugestao_textos_classificar stc) or 
-                    tc.id in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.985)
+                    (  
+                       tc.id in (select stc.idbase from sugestao_textos_classificar stc) or 
+                       tc.id in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.985)
                     )
                     and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}                
                 )
                 UNION 
                 /*Aqui pede todos os textos que não estejam como similares que são diferentes*/
                 (
-                    select tc.TxtTreinamento,tc.QtdPalavras 
+                    select tc.TxtTreinamento,tc.QtdPalavras,min(tc.id) as id
                     from textos_classificar tc
                     where 
-                    ( tc.id not in (select stc.idbase from sugestao_textos_classificar stc) or 
-                    tc.id not in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.99)
+                    (
+                       tc.id not in (select stc.idbase from sugestao_textos_classificar stc) or 
+                       tc.id not in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.99)
                     )
                     and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}
                     group by tc.TxtTreinamento    
@@ -81,7 +83,7 @@ class DAPT_bge_m3:
         try:
             with open(dapt_file_path, 'w', encoding='utf-8') as f:
                 json.dump(dapt_data, f, ensure_ascii=False, indent=2)
-            result = f"Dataset DAPT salvo com sucesso em: {dapt_file_path}"
+            result = f"Dataset DAPT salvo com sucesso em: {dapt_file_path}" + "\n"
             print_with_time(result)
             print_with_time(f"Total de documentos incluídos no dapt.json: {len(dapt_data)}")
             dapt_data.clear()  # Limpa a lista após salvar o arquivo
@@ -105,7 +107,8 @@ class DAPT_bge_m3:
         processados = 0        
         dapt_dataset = []
         nivel_palavras = 1
-                
+        result = ""
+        #gera os dadasets baseados na quantidade de caracteres para otimizar o treinamento
         for i in tqdm(range(0, len(dados) ), desc=f"Exportando dados para DAPT"):
             ### Aqui gerar o dataset DAPT
             row = dados[i]            
@@ -113,29 +116,28 @@ class DAPT_bge_m3:
                 txtTreinamento = row['TxtTreinamento'].strip()
                 qtdPalavras    = row['QtdPalavras']                
                 # Formato exigido pelo Axolotl para continued pre-training (DAPT)
-                dapt_dataset.append({"text": txtTreinamento})
+                dapt_dataset.append({"text": txtTreinamento,
+                                     "id": row["id"]
+                                     })
                 processados += 1
                 if (nivel_palavras == 1) and (qtdPalavras > 128):
                     nivel_palavras = 2
-                    self._save_dapt_file(dapt_dataset,"0128")
-                    
+                    result += self._save_dapt_file(dapt_dataset,"0128")
                 elif (nivel_palavras == 2) and (qtdPalavras >= 256):
                     nivel_palavras = 3
-                    self._save_dapt_file(dapt_dataset,"0256")
-                    #dapt_dataset = []  # Reinicia o dataset para o próximo nível    
+                    result += self._save_dapt_file(dapt_dataset,"0256")                    
                 elif (nivel_palavras == 3) and (qtdPalavras >= 512):
                     nivel_palavras = 4
-                    self._save_dapt_file(dapt_dataset,"0512")
-                    
+                    result += self._save_dapt_file(dapt_dataset,"0512")                    
                 elif (nivel_palavras == 4) and (qtdPalavras >= 768):
                     nivel_palavras = 5
-                    self._save_dapt_file(dapt_dataset,"0768")                    
+                    result += self._save_dapt_file(dapt_dataset,"0768")                    
                 elif (nivel_palavras == 5) and (qtdPalavras >= 1024):
                     nivel_palavras = 6
-                    self._save_dapt_file(dapt_dataset,"1024")                    
+                    result += self._save_dapt_file(dapt_dataset,"1024")                    
                 elif (nivel_palavras == 6) and (qtdPalavras >= 1512):
                     nivel_palavras = 7
-                    self._save_dapt_file(dapt_dataset,"1512")                            
+                    result += self._save_dapt_file(dapt_dataset,"1512")                            
                     
                         
             except Exception as e:
@@ -144,7 +146,7 @@ class DAPT_bge_m3:
                 continue
             
         # Salva o ultimo arquivo DAPT com o saldo de dados
-        result_dapt =  self._save_dapt_file(dapt_dataset,"2048")                    
+        result +=  self._save_dapt_file(dapt_dataset,"2048")                    
 
         elapsed     = time.time() - iniTime
         str_elapsed = f"Duração: {elapsed/60:.2f} min"
@@ -155,4 +157,4 @@ class DAPT_bge_m3:
                     "message": f"Erros {tmpErros} registros. processados {processados} registros, {str_elapsed}"}
         else:
             return {"status": "Sucesso",
-                    "message": f"{result_dapt} tempo decorrido:  {str_elapsed}"}
+                    "message": f"{result} tempo decorrido:  {str_elapsed}"}
