@@ -554,7 +554,7 @@ class sugere_textos_classificarBll:
             data = self._get_lista_textos_duplicados()
             self._processa_textos_duplicados(data)                     
 
-            print_with_time(f"Iniciando busca de textos similares...")
+            print_with_time(f"Iniciando busca de textos similares Nivel {ContadorEntrada}...")
             data = self._get_textos_falta_buscar_similar()
             self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem denovo a lista atual ja inserida em sugestao_textos_classificar 
 
@@ -585,7 +585,8 @@ class sugere_textos_classificarBll:
             itens_restantes = self._get_qtd_textos_falta_buscar_similar()
             
             #aqui caso faltem itens e o nivel de busca seja menor que 5 faz uma nova chamada recursiva para buscar mais similares
-            if (itens_restantes > 0) and ((NivelBuscaSimilar > 0) and (ContadorEntrada <= 5)):
+            if (itens_restantes > 0) and ((NivelBuscaSimilar > 0) and (ContadorEntrada <= 5)): 
+                print_with_time(f"{sucessMessage} no nível {ContadorEntrada}, buscando próximos níveis...")                   
                 self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1)        
                 itens_restantes = self._get_qtd_textos_falta_buscar_similar()
                 
