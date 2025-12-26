@@ -6,7 +6,6 @@ from sys import exception
 from typing import Any, Optional
 from networkx import reconstruct_path
 from pkg_resources import UnknownExtra
-from sklearn.covariance import empirical_covariance
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 from sympy import Id
