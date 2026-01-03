@@ -207,8 +207,8 @@ class sugere_textos_classificarBll:
 
                 #agora vai procurar textos altamente similares para sugerir classificação
                 lista_similares = self.get_similares(data=txtToFindSimilar,
-                                                     min_similarity=self.get_min_similarity(txtToFindSimilar['QtdPalavras'],1),
-                                                     itens_limit=500)
+                                                     min_similarity=0.989,
+                                                     itens_limit=1000)
                 
                 self._insere_similares(item["IdBase"], lista_similares, 1)
                 if lista_similares != None:
@@ -338,6 +338,25 @@ class sugere_textos_classificarBll:
                                                                         gravar_log=False,
                                                                         min_similarity = min_similarity,
                                                                         exclusion_list = self.lista_sugestao_textos_classificar)
+
+            #caso for retornado o limite de itens tenta aumentar a busca para pegar mais                
+            qtd_similares =  len(result.ListaSimilaridade) if (result != None) and (result.ListaSimilaridade != None) else 0
+                  
+            if qtd_similares == itens_limit:                
+                result = self.classifica_textoBll.get_similarity_list(query_embedding= id_found["Embedding"],
+                                                                        collection_name=self.textos_classificar_collection_name,
+                                                                        id_a_classificar= None,
+                                                                        TabelaOrigem="C",
+                                                                        itens_limit=itens_limit+10000,
+                                                                        gravar_log=False,
+                                                                        min_similarity = min_similarity,
+                                                                        exclusion_list = self.lista_sugestao_textos_classificar)
+                qtd_similares_novo =  len(result.ListaSimilaridade) if (result != None) and (result.ListaSimilaridade != None) else 0        
+                if qtd_similares_novo > qtd_similares:
+                    print(f"Aumentou a quantidade de similares de {qtd_similares} para {qtd_similares_novo} para o texto id {id} com min_similarity {min_similarity}")
+                
+
+               
             if (result == None) or (result.ListaSimilaridade == None):
                 return None # type: ignore
             
@@ -570,7 +589,7 @@ class sugere_textos_classificarBll:
             self.similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para buscar similares"):
                 try:
-                    lista_similares = self.get_similares(data=row,itens_limit=100)
+                    lista_similares = self.get_similares(data=row,itens_limit=300)
                     self._insere_similares(row['id'], lista_similares, 3)
                 
                 except Exception as e:

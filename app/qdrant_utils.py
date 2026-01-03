@@ -44,7 +44,7 @@ class Qdrant_Utils:
 
             return True
         except Exception as e:
-            raise RuntimeError(f"[ERRO] Falha ao conectar no qDrant: {e}")
+            raise RuntimeError(f"[ERRO] Falha ao conectar no banco vetorial: {e}")
         
     #verifica se o cliente esta conectado
     def connected(self) -> bool:        

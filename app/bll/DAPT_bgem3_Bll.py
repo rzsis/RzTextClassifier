@@ -36,8 +36,8 @@ class DAPT_bge_m3:
 
     #faz a consulta no banco de dados para obter os dados a serem processados
     def _fetch_data(self) -> list:   
-        qtdPalavrasMinima = 50
-        qtdPalavrasMaxima = 2048
+        qtdPalavrasMinima = 80
+        qtdPalavrasMaxima = 2100#faz até 2100 pois ele só salva até 2048 e deixa uma margem de segurança
 
         query = f"""
                 (
@@ -45,8 +45,7 @@ class DAPT_bge_m3:
                     from textos_classificar tc
                     where 
                     (  
-                       tc.id in (select stc.idbase from sugestao_textos_classificar stc) or 
-                       tc.id in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.985)
+                       tc.id in (select stc.idbase from sugestao_textos_classificar stc)
                     )
                     and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}                
                 )
@@ -58,7 +57,7 @@ class DAPT_bge_m3:
                     where 
                     (
                        tc.id not in (select stc.idbase from sugestao_textos_classificar stc) or 
-                       tc.id not in (select stc2.idsimilar from sugestao_textos_classificar stc2 where stc2.Similaridade < 0.99)
+                       tc.id not in (select stc2.idsimilar from sugestao_textos_classificar stc2)
                     )
                     and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}
                     group by tc.TxtTreinamento    
@@ -114,8 +113,9 @@ class DAPT_bge_m3:
             row = dados[i]            
             try:
                 txtTreinamento = row['TxtTreinamento'].strip()
+                txtTreinamento = re.sub(r'\{[A-Za-z]{1,12}\}', '', txtTreinamento)  # Remove tags {TAG}
                 qtdPalavras    = row['QtdPalavras']                
-                # Formato exigido pelo Axolotl para continued pre-training (DAPT)
+                
                 dapt_dataset.append({"text": txtTreinamento,
                                      "id": row["id"]
                                      })
@@ -138,8 +138,14 @@ class DAPT_bge_m3:
                 elif (nivel_palavras == 6) and (qtdPalavras >= 1512):
                     nivel_palavras = 7
                     result += self._save_dapt_file(dapt_dataset,"1512")                            
-                    
-                        
+                elif (nivel_palavras == 7) and (qtdPalavras >= 1768):
+                    nivel_palavras = 8
+                    result += self._save_dapt_file(dapt_dataset,"1768")                
+                elif (nivel_palavras == 8) and (qtdPalavras >= 2048):
+                    nivel_palavras = 9
+                    result += self._save_dapt_file(dapt_dataset,"2048")      
+
+
             except Exception as e:
                 tmpErros += f"Erro ao processar registro {i+1}: {e}\n"
                 print_with_time(f"Erro ao processar registro {i+1}: {e}")
