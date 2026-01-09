@@ -9,7 +9,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "python": "/opt/venv_3_11_14/bin/python",
         }
     ]
 }
