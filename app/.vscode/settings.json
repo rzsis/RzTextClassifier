@@ -1,5 +1,5 @@
 {
-  "python.defaultInterpreterPath": "/home/rz/venv3_11_14/bin/python3.11",
+  "python.defaultInterpreterPath": "/opt/venv_3_11_14/bin/python",
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
   "python.analysis.indexing": true,

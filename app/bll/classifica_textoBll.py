@@ -71,8 +71,8 @@ class classifica_textoBll:
             results = self.qdrant_utils.search_embedding(embedding= query_embedding,
                                                          collection_name= collection_name,
                                                          itens_limit= itens_limit,
-                                                         similarity_threshold= min_similarity,
-                                                         exclusion_list = exclusion_list)
+                                                         similarity_threshold= min_similarity
+                                                         )
                     
             if not results:
                 return self.ResultadoSimilaridade(

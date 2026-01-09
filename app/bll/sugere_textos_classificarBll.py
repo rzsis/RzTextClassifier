@@ -241,9 +241,9 @@ class sugere_textos_classificarBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao obter _get_textos_falta_buscar_similar: {e}")
     
-        """   Curva de similaridade mínima baseada em quantidade de palavras e nível de busca
-          Palavras |     N1     N2     N3     N4     N5
-        --------     |--------------------------------------
+        """   Curva de similaridade mínima baseada em quantidade de palavras e nível de busca          
+       Palavras |     N1     N2     N3     N4     N5
+   --------     |--------------------------------------
              0  |  0.980  0.960  0.940  0.920  0.900
             25  |  0.980  0.960  0.940  0.920  0.900
             50  |  0.981  0.961  0.941  0.921  0.901
@@ -317,7 +317,7 @@ class sugere_textos_classificarBll:
 
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação
     #min_similarity = Caso eu quer uma similaridade mínima diferente da calculada, posso passar no parâmetro min_similarity        
-    def get_similares(self,data: dict,  min_similarity:float = None,itens_limit:int = 100) -> list: # type: ignore
+    def get_similares(self,data: dict,  min_similarity:float = None,itens_limit:int = 300) -> list: # type: ignore
         try:
             id              = data['id']  
             qtdPalavras     = data['QtdPalavras'] or 0
@@ -325,41 +325,35 @@ class sugere_textos_classificarBll:
             if min_similarity is None:
                 min_similarity  = self.get_min_similarity(qtdPalavras, nivelBusca)
 
-
             id_found        = self.qdrant_utils.get_id(id=id, collection_name=self.textos_classificar_collection_name)                    
             if (id_found == None):
                 return None # type: ignore
                     
             result          = self.classifica_textoBll.get_similarity_list(query_embedding= id_found["Embedding"],
-                                                                        collection_name=self.textos_classificar_collection_name,
-                                                                        id_a_classificar= None,
-                                                                        TabelaOrigem="C",
-                                                                        itens_limit=itens_limit,
-                                                                        gravar_log=False,
-                                                                        min_similarity = min_similarity,
-                                                                        exclusion_list = self.lista_sugestao_textos_classificar)
+                                                                           collection_name=self.textos_classificar_collection_name,
+                                                                           id_a_classificar= None,
+                                                                           TabelaOrigem="C",
+                                                                           itens_limit=itens_limit,
+                                                                           gravar_log=False,
+                                                                           min_similarity = min_similarity,
+                                                                           exclusion_list = [])
 
+            if (result == None) or (result.ListaSimilaridade == None):
+                return None # type: ignore
+            
             #caso for retornado o limite de itens tenta aumentar a busca para pegar mais                
-            qtd_similares =  len(result.ListaSimilaridade) if (result != None) and (result.ListaSimilaridade != None) else 0
+            qtd_similares =  len(result.ListaSimilaridade) 
                   
-            if qtd_similares == itens_limit:                
+            if (itens_limit > 0) and (qtd_similares >= itens_limit):                
                 result = self.classifica_textoBll.get_similarity_list(query_embedding= id_found["Embedding"],
                                                                         collection_name=self.textos_classificar_collection_name,
                                                                         id_a_classificar= None,
                                                                         TabelaOrigem="C",
                                                                         itens_limit=itens_limit+10000,
                                                                         gravar_log=False,
-                                                                        min_similarity = min_similarity,
-                                                                        exclusion_list = self.lista_sugestao_textos_classificar)
-                qtd_similares_novo =  len(result.ListaSimilaridade) if (result != None) and (result.ListaSimilaridade != None) else 0        
-                if qtd_similares_novo > qtd_similares:
-                    print(f"Aumentou a quantidade de similares de {qtd_similares} para {qtd_similares_novo} para o texto id {id} com min_similarity {min_similarity}")
-                
-
-               
-            if (result == None) or (result.ListaSimilaridade == None):
-                return None # type: ignore
-            
+                                                                        min_similarity = min_similarity)
+                                                
+                                    
             lista_similares = [item.__dict__ for item in result.ListaSimilaridade if item.IdEncontrado not in self.lista_sugestao_textos_classificar] # type: ignore
             return lista_similares
         except Exception as e:
@@ -561,7 +555,7 @@ class sugere_textos_classificarBll:
 
     #para depois o usuario sugerir classificações
     #NivelBuscaSimilar = 0 pois assim ele só verifica o nivel atual caso maior ele vai incrementando e buscando mais similares até o nivel 5
-    def sugere_textos_para_classificar(self,NivelBuscaSimilar:int = 0,ContadorEntrada = 0) -> dict:
+    def sugere_textos_para_classificar(self,NivelBuscaSimilar:int = 0,ContadorEntrada = 1) -> dict:
         try:
             #primeiro deve indexar tudo no qdrant para depois fazer a busca
             inicio = time.time()
@@ -570,8 +564,9 @@ class sugere_textos_classificarBll:
 
             print_with_time(f"Iniciando busca de textos duplicados...")
             self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem a lista atual ja inserida em sugestao_textos_classificar ja inserido no banco
-            data = self._get_lista_textos_duplicados()
-            self._processa_textos_duplicados(data)                     
+            if (ContadorEntrada == 1):
+                data = self._get_lista_textos_duplicados()
+                self._processa_textos_duplicados(data)                     
 
             print_with_time(f"Iniciando busca de textos similares Nivel {ContadorEntrada}...")
             data = self._get_textos_falta_buscar_similar()
@@ -589,7 +584,7 @@ class sugere_textos_classificarBll:
             self.similares_inseridos = 0
             for row in tqdm(data, desc="Processando textos para buscar similares"):
                 try:
-                    lista_similares = self.get_similares(data=row,itens_limit=300)
+                    lista_similares = self.get_similares(data=row,itens_limit=500)
                     self._insere_similares(row['id'], lista_similares, 3)
                 
                 except Exception as e:
@@ -604,7 +599,7 @@ class sugere_textos_classificarBll:
             itens_restantes = self._get_qtd_textos_falta_buscar_similar()
             
             #aqui caso faltem itens e o nivel de busca seja menor que 5 faz uma nova chamada recursiva para buscar mais similares
-            if (itens_restantes > 0) and ((NivelBuscaSimilar > 0) and (ContadorEntrada <= 5)): 
+            if (itens_restantes > 0) and (ContadorEntrada <= NivelBuscaSimilar): 
                 print_with_time(f"{sucessMessage} no nível {ContadorEntrada}, buscando próximos níveis...")                   
                 self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1)        
                 itens_restantes = self._get_qtd_textos_falta_buscar_similar()

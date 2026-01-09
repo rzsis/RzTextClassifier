@@ -2,18 +2,12 @@
 from ast import Dict
 from datetime import date
 import datetime
-from socket import timeout
 from typing import Any, List, Optional
-from typing_extensions import runtime
-import venv
-from xmlrpc.client import boolean
-from aiohttp import Payload
 import numpy as np
-from pymysql import connect
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondition, MatchValue,MatchExcept, MatchAny
-from sympy import Range, false, true
+from qdrant_client.models import Filter, HasIdCondition
+from qdrant_client.http.models import Distance,  FieldCondition, MatchValue
 from common import print_with_time, print_error, get_localconfig
 import re
 import requests
@@ -28,9 +22,8 @@ class Qdrant_Utils:
         self._qdrant_url = localcfg.get("vectordatabasehost")
         self._qdrant_client = None
         self.collectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
-        self._connect_qDrant()
-        self._old_exclusion_list = []  # Cache para lista de exclusão antiga
-        self._oldFilter = None
+        self._connect_qDrant()        
+        self.vector_name = "default"
 
     def _connect_qDrant(self) -> bool:
         try:
@@ -47,7 +40,10 @@ class Qdrant_Utils:
             raise RuntimeError(f"[ERRO] Falha ao conectar no banco vetorial: {e}")
         
     #verifica se o cliente esta conectado
-    def connected(self) -> bool:        
+    def connected(self) -> bool:  
+        if self._qdrant_client is None:
+                return False
+
         try:
             health = self._qdrant_client.get_health()
             # Alguns servidores retornam {'status': 'ok'} ou algo similar
@@ -81,23 +77,7 @@ class Qdrant_Utils:
             self._qdrant_client.close()  # Use close() instead of dispose()
             self._qdrant_client = None
 
-    #para evitar tentar ganhar perfomance e não montar a lista de exclusão toda hora
-    def _get_exclusion_list(self, exclusion_list: List[int]) -> Filter:
-        if (exclusion_list) and (exclusion_list != self._old_exclusion_list):
-            self._old_exclusion_list  = exclusion_list            
-            self._oldFilter = Filter(
-                must_not=[
-                    FieldCondition(
-                        key="id",
-                        match=MatchAny(any=exclusion_list)
-                    )
-                ]
-            )
-            return self._oldFilter
-        else:   
-            return self._oldFilter       # type: ignore
-            
-    
+      
     #Cria a coleção no Qdrant se não existir
     def create_collection(self, pCollection_name: str):
         try:
@@ -175,21 +155,18 @@ class Qdrant_Utils:
                          embedding: np.ndarray,
                          collection_name: str,
                          itens_limit: int,
-                         similarity_threshold: float,
-                         exclusion_list: List[int]) -> list[dict]:
+                         similarity_threshold: float) -> list[dict]:
         try: 
             high_similars = []         
             embedding = np.array(embedding, dtype=float)  
-
-            # Criar filtro de exclusão de IDs
-            search_filter = self._get_exclusion_list(exclusion_list)            
+                     
 
             search_results = self._qdrant_client.search(
                 collection_name=collection_name,
                 query_vector=embedding.flatten().tolist(),
                 limit=itens_limit,
                 score_threshold=similarity_threshold,
-                query_filter=search_filter 
+                query_filter=None
             )
 
 
@@ -223,7 +200,7 @@ class Qdrant_Utils:
             high_similars = []
             embedding = np.array(embedding, dtype=float)
 
-            similarity_threshold = similarity_threshold / 100
+            similarity_threshold = similarity_threshold / 100 #aqui divide por 100 pois vem de consulta externa que trata os dados em 100% e não 1
             # ------------------- Construção do filtro -------------------
             filter_clauses = []
 
