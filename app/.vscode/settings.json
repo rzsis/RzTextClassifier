@@ -7,7 +7,7 @@
   "python.analysis.completeFunctionParens": true,
   "python.analysis.typeCheckingMode": "standard",
   "python.analysis.diagnosticSeverityOverrides": {
-    "typeCheckingMode": "basic",  // ou "off"    
+    "typeCheckingMode": "basic",   
     "reportArgumentType": "none",
     "reportAttributeAccessIssue": "none",
     "reportGeneralTypeIssues": "none",
