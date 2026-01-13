@@ -196,7 +196,6 @@ class classifica_textoBll:
                                             TabelaOrigem=TabelaOrigem, 
                                             itens_limit=limite_itens,
                                             gravar_log=gravar_log,
-                                            exclusion_list= [])
-        
+                                            exclusion_list= [])        
         except Exception as e:
-            raise RuntimeError(f"Erro ao classificar texto: {e}")
+            raise RuntimeError(f"Erro em classificar texto: {e}")

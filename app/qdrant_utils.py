@@ -44,13 +44,12 @@ class Qdrant_Utils:
         if self._qdrant_client is None:
                 return False
 
-        try:
-            health = self._qdrant_client.get_health()
-            # Alguns servidores retornam {'status': 'ok'} ou algo similar
-            if isinstance(health, dict) and health.get("status") == "ok":
-                return True
-            return False
-        except (ConnectionError, UnexpectedResponse, Exception):
+        try:                        
+            self._qdrant_client.get_collections()# Faz uma consulta simples para verificar a conexão
+            return True
+        except (ConnectionError, UnexpectedResponse, Exception) as e:
+            print_with_time(f"Tipo: {type(e)} Repr: {repr(e)}")      
+            print_with_time(f"Exception {e} ao verificar conexão com Qdrant.")            
             return False
             
     #obtem o cliente do qdrant  
@@ -77,7 +76,27 @@ class Qdrant_Utils:
             self._qdrant_client.close()  # Use close() instead of dispose()
             self._qdrant_client = None
 
-      
+    #Retorna uma lista com os nomes das collections existentes no Qdrant.
+    def list_collections(self) -> List[str]:
+        try:
+            if not self.connected():
+                raise RuntimeError("Cliente Qdrant não está conectado.")
+
+            collections = self._qdrant_client.get_collections()
+
+            # Extrai apenas os nomes das collections
+            collection_names = [
+                collection.name
+                for collection in collections.collections
+            ]
+
+            return collection_names
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ao listar collections no banco vetorial: {e}")
+            return []
+
+
     #Cria a coleção no Qdrant se não existir
     def create_collection(self, pCollection_name: str):
         try:
@@ -94,7 +113,7 @@ class Qdrant_Utils:
                 print_with_time(f"Criada collection Qdrant: {pCollection_name}")
 
         except Exception as e:
-            raise RuntimeError(f"Erro criando create_collection em Qdrant_Utils: {e}")
+            raise RuntimeError(f"Erro criando create_collection no banco vetorial: {e}")
 
     #Força o Qdrant a reindexar a coleção imediatamente.
     #Ele compacta segmentos e recria índices HNSW se necessário.
@@ -184,7 +203,7 @@ class Qdrant_Utils:
             return high_similars
         
         except Exception as e:
-            print_with_time(f"Erro ao buscar similares no Qdrant {e}")
+            print_with_time(f"Erro ao buscar similares no banco vetorial {e}")
             return []
         
     def search_embedding_and_metaData(self,
@@ -281,7 +300,7 @@ class Qdrant_Utils:
             return high_similars
 
         except Exception as e:
-            print_with_time(f"Erro ao buscar similares no Qdrant: {e}")
+            print_with_time(f"Erro ao buscar similares no banco vetorial: {e}")
             return []
 
 
@@ -294,7 +313,7 @@ class Qdrant_Utils:
                 with_payload=["Classe", "CodClasse"]
             )
             if not records:
-                print_with_time(f"Aviso: Id {id} não encontrado no Qdrant, pulando")
+                print_with_time(f"Aviso: Id {id} não encontrado no banco vetorial, pulando")
                 return None
 
             rec = records[0]
@@ -303,7 +322,7 @@ class Qdrant_Utils:
                 vec = vec.get(self.vector_name)  # por ex. "text"            
                 
             if vec is None:
-                print_with_time(f"Aviso: Id {id} não possui vetor no Qdrant, pulando")
+                print_with_time(f"Aviso: Id {id} não possui vetor no banco vetorial, pulando")
                 return None
 
             try:

@@ -19,7 +19,8 @@ class busca_textoBLL:
     def __init__(self, embeddingsModule: EmbeddingsBll, session: Session):             
         self.embeddingsModule = embeddingsModule                  
         self.session = session  
-        self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance       
+        self.qdrant_utils = Qdrant_UtilsModule()  # Initialize Qdrant_Utils instance
+        self.collections = self.qdrant_utils.list_collections()     
             
 
     ### Busca texto e retorna similaridades  
@@ -37,6 +38,8 @@ class busca_textoBLL:
                raise RuntimeError("O texto para busca deve ter mais de 3 caracteres.")
 
            collection_name = self.qdrant_utils.get_collection_name(collection_name)
+           if collection_name not in self.collections:
+               raise RuntimeError(f"A collection '{collection_name}' não existe no banco vetorial.")
 
            # Generate embedding for the input text to compare in future
            query_embedding = self.embeddingsModule.generate_embedding(text = texto, Id = 0) # Id = 0 é porque não importa nesse caso
@@ -51,4 +54,4 @@ class busca_textoBLL:
                                                          data_final = data_final)
                             
         except Exception as e:
-            raise RuntimeError(f"Erro ao classificar texto: {e}")
+            raise RuntimeError(f"Erro em busca_texto: {e}")
