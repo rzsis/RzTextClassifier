@@ -16,6 +16,7 @@ from collections.abc import Sequence
 import torch
 import time
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
+from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
 
 
 class edit_textos_treinamentoBLL:
@@ -54,7 +55,9 @@ class edit_textos_treinamentoBLL:
         if not idFound:
             raise RuntimeError(f"Erro: O ID {id} não foi encontrado na coleção final.")
 
-        itens_colidentes = self.check_collidingBll.check_colliding_by_Embedding(idFound["Embedding"], id, codClasse)
+        check_collidingBLLModule_handle = check_collidingBLLModule(self._session)
+
+        itens_colidentes = check_collidingBLLModule_handle.check_colliding_by_Embedding(idFound["Embedding"], id, codClasse)
         if len(itens_colidentes) > 0:
             return {
                 "status": "ERROR",
