@@ -34,7 +34,10 @@ class BgeM3OnnxExporter:
 
     def __init__(self): 
         import localconfig      
-        self.model_path_source: str = str(localconfig.getModelPath())
+        self.model_path_source: str = str(localconfig.get("bge_m3_model_path"))
+        if self.model_path_source == "":
+            raise RuntimeError("[ERRO] bge_m3_model_path não está configurado no localconfig.")
+    
         self.max_length: int = int(localconfig.get("max_length"))        
         if self.max_length > 1024:
             raise RuntimeError(f"[AVISO] max_length não pode ser maior que 1024.")
@@ -146,7 +149,10 @@ class BgeM3OnnxExporter:
             "config.json",
             "modules.json",
             "sentence_bert_config.json",
-            "config_sentence_transformers.json",
+            "config_sentence_transformers.json" ,
+            "model.safetensors"         ,
+            "pytorch_model.bin"
+
         ]
 
         for fname in files_to_copy:

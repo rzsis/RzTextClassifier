@@ -53,7 +53,7 @@ if __name__ == "__main__":
     # Garantir que ao exportar para ONNX o modelo seja o bge original e não o convertido ONNX
     # Gerar um readme com explicacoes do modelo exportado
 
-   # bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
+    #bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
     import uvicorn
     HTTP_PORT = int(localconfig.get("http_port"))

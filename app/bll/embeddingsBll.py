@@ -184,9 +184,10 @@ class EmbeddingsBll:
     #Carrega o modelo e tokenizer."""
     def load_model_and_tokenizer(self) -> None:       
         try:
-            model_path  = f"{self.localconfig.getModelPath()}-dense-onnx"
-            onnx_path_batch = f"{model_path}/bge-m3-dense.onnx"
-            print_with_time(f"[INFO] Carregando tokenizer e modelo de: {onnx_path_batch}")                        
+            model_path  = self.localconfig.getModelPath()
+            # ===== Carrega modelo ONNX para inferência individual =====            
+            onnx_file_name = f"{model_path}/bge-m3-dense.onnx"
+            print_with_time(f"[INFO] Carregando tokenizer e modelo de: {onnx_file_name}")                        
 
             # 1. Carrega o tokenizer (essencial!)
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -211,11 +212,8 @@ class EmbeddingsBll:
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True    
 
-            # ===== Carrega modelo ONNX para inferência individual =====
-            onnx_path = f"{model_path}/bge-m3-dense.onnx"
-
-            if not os.path.isfile(onnx_path):
-                raise FileNotFoundError(f"Arquivo ONNX não encontrado: {onnx_path}")            
+            if not os.path.isfile(onnx_file_name):
+                raise FileNotFoundError(f"Arquivo ONNX não encontrado: {onnx_file_name}")            
 
             providers = (
                 ["CUDAExecutionProvider", "CPUExecutionProvider"]
@@ -224,7 +222,7 @@ class EmbeddingsBll:
             )
 
             self.onnx_session = ort.InferenceSession(
-                onnx_path,
+                onnx_file_name,
                 providers=providers
             )                                  
             
