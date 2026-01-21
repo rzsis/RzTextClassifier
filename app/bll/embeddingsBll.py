@@ -8,10 +8,10 @@ from transformers import AutoTokenizer,AutoModel
 import torch
 import torch.nn as nn
 import bll.onxx_utils.dense_embedding_wrapper as dense_embedding_wrapperModule
+import onnxruntime as ort
+import os
 
 bllEmbeddings = None
-
-
 
 def initBllEmbeddings(session=Session):
     global bllEmbeddings
@@ -42,52 +42,7 @@ class EmbeddingsBll:
         # ===== PyTorch GPU (para indexação em lote) =====
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.torch_model = None  # type: ignore                
-
-    
-    # Código antigo que estava quebrando o texto com 1024 caracteres
-    # # Gera embeddings para uma lista de textos agilizando assim a indexação
-    # # Gera embeddings em lote usando PyTorch + GPU (batch dinâmico)
-    # #Se len(texts) não for múltiplo de 16 → padding com textos vazios.
-    # #Retorna lista de embeddings na ordem original.   
-    # def generate_embeddings(self, texts: List[str], ids: Optional[List[Optional[int]]] = None):                
-    #     if not texts:
-    #         return []
-
-    #     # ===== limpeza e truncamento (igual ao que você já fazia) =====
-    #     clean_texts = []
-    #     for txt in texts:
-    #         if not txt or not isinstance(txt, str):
-    #             clean_texts.append("")
-    #         else:
-    #             clean = ''.join(c for c in txt if ord(c) >= 32 and ord(c) != 127)
-    #             clean_texts.append(clean.strip()[:self.max_length])
-
-    #     # ===== tokenização (CPU) =====
-    #     inputs = self.tokenizer(
-    #         clean_texts,
-    #         return_tensors="pt",
-    #         truncation=True,
-    #         padding=True,                 # padding dinâmico → melhor desempenho
-    #         max_length=self.max_length,
-    #     ) # type: ignore
-
-    #     # ===== move para GPU (async) =====
-    #     inputs = {
-    #         k: v.to(self.device, non_blocking=True)
-    #         for k, v in inputs.items()
-    #     }
-
-    #     # ===== forward GPU =====
-    #     with torch.no_grad():
-    #         embeddings = self.torch_model(
-    #             input_ids=inputs["input_ids"],
-    #             attention_mask=inputs["attention_mask"],
-    #         ) # type: ignore
-
-    #     # ===== volta para CPU / numpy =====
-    #     embeddings = embeddings.detach().cpu().numpy().astype("float32")
-
-    #     return embeddings
+        self.onnx_session = None  # type: ignore
 
     def _forward_embeddings(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         if self.torch_model is None:
@@ -169,7 +124,7 @@ class EmbeddingsBll:
                 batch_texts,
                 return_tensors="pt",
                 truncation=True,
-                max_length=self.max_length,  # <-- truncamento correto por tokens
+                max_length=self.max_length, 
                 padding=True,
                 pad_to_multiple_of=8 if self.device.type == "cuda" else None,
             ) # type: ignore
@@ -194,10 +149,37 @@ class EmbeddingsBll:
             raise RuntimeError(f"Erro ao gerar embeddings para IDs {error_ids} e texts {error_texts}: {e}")
 
 
-    #Gera embedding para um texto
-    def generate_embedding(self, text: str, Id: Optional[int]) -> Optional[np.ndarray]:        
-        result = self.generate_embeddings(texts=text, ids=Id)
-        return result  # type: ignore
+
+    #Gera embedding para um texto usando o ONNX (individual)
+    def generate_embedding(self, text: str, Id: Optional[int]) -> Optional[np.ndarray]: 
+        try:
+            if not text or not isinstance(text, str):
+                return None
+
+            clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127).strip()
+            if not clean_text:
+                return None
+
+            if self.onnx_session is None:
+                raise RuntimeError("onnx_session não carregada.")
+
+            inputs = self.tokenizer(
+                clean_text,
+                return_tensors="np",
+                truncation=True,
+                max_length=self.max_length,
+                padding="max_length",
+            ) # type: ignore
+
+            ort_inputs = {
+                "input_ids": inputs["input_ids"],
+                "attention_mask": inputs["attention_mask"],
+            }
+
+            embedding = self.onnx_session.run(None, ort_inputs)[0]
+            return embedding[0].astype("float32") # type: ignore
+        except Exception as e:
+            raise RuntimeError(f"Erro ONNX ao gerar embedding para ID {Id}: {e}")     
     
     #Carrega o modelo e tokenizer."""
     def load_model_and_tokenizer(self) -> None:       
@@ -227,7 +209,41 @@ class EmbeddingsBll:
             # TF32 ajuda bastante em GPUs modernas (mantém precisão boa pra embeddings)
             if self.device.type == "cuda":
                 torch.backends.cuda.matmul.allow_tf32 = True
-                torch.backends.cudnn.allow_tf32 = True                      
+                torch.backends.cudnn.allow_tf32 = True    
+
+            # ===== Carrega modelo ONNX para inferência individual =====
+            onnx_path = f"{model_path}/bge-m3-dense.onnx"
+
+            if not os.path.isfile(onnx_path):
+                raise FileNotFoundError(f"Arquivo ONNX não encontrado: {onnx_path}")            
+
+            providers = (
+                ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                if self.device.type == "cuda"
+                else ["CPUExecutionProvider"]
+            )
+
+            self.onnx_session = ort.InferenceSession(
+                onnx_path,
+                providers=providers
+            )                                  
             
+            # Verifica inputs
+            input_names = {i.name for i in self.onnx_session.get_inputs()}
+            if input_names != {"input_ids", "attention_mask"}:
+                raise RuntimeError(f"Inputs ONNX inesperados: {input_names}")
+
+            # Verifica output
+            out = self.onnx_session.get_outputs()[0]
+            if out.name != "sentence_embedding":
+                raise RuntimeError(f"Output ONNX inesperado: {out.name}")
+
+            shape = out.shape
+            if len(shape) != 2:
+                raise RuntimeError(f"Shape ONNX inválido: {shape}")
+
+            if isinstance(shape[1], int):
+                self.embedding_dim = shape[1]     
+
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar tokenizer ou modelo: {e}")
