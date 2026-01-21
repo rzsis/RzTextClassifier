@@ -38,6 +38,7 @@ def checkRequiredKeys():
         "codcli", ##codigo do cliente na base de dados
         "text_limit_per_batch", # Limite de textos por lote para classificação
         "workers" # Número de workers para o servidor HTTP
+        
     ]
 
     missing_keys = [key for key in required_keys if key not in __configReaded]

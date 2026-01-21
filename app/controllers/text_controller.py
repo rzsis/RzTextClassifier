@@ -27,7 +27,7 @@ async def ClassificaTexto(texto: str,
                           TabelaOrigem:Optional[str] = "",
                           session: Session = Depends(get_session_db)  ):    
     # Executar script de restauração
-    embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado  
+    embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado  
 
     try:     
         classifica_textoBll = classifica_textoBllModule.classifica_textoBll(embeddingsBllModule.bllEmbeddings,session)
@@ -45,7 +45,7 @@ async def ClassificaTexto(texto: str,
 @router.post("/classifica_textos_pendentes")
 async def classifica_textos_pendentes(session: Session = Depends(get_session_db)  ):        
     try:     
-        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         classifica_textos_pendentesBll = classifica_textos_pendentesBllModule(session)
         return classifica_textos_pendentesBll.classifica_textos_pendentes()
         
@@ -58,7 +58,7 @@ async def sugere_textos_classificar(NivelBuscaSimilar:int=0,
     session: Session = Depends(get_session_db)  ):        
 
     try:     
-        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado          
         sugere_textos_classificarBll = sugere_textos_classificarBllModule(session)
         return sugere_textos_classificarBll.sugere_textos_para_classificar(NivelBuscaSimilar)
         
@@ -68,10 +68,9 @@ async def sugere_textos_classificar(NivelBuscaSimilar:int=0,
 #endpoint para sugere textos a classificar
 @router.post("/indexa_textos_classificar")
 async def indexa_textos_classificar(session: Session = Depends(get_session_db)  ):        
-
     try:     
-        embeddingsBllModule.initBllEmbeddings(session)  # inicializa bllEmbeddings se ainda não foi inicializado          
-        indexa_textos_classificar = indexa_textos_classificarBllModule(session)
+        embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        indexa_textos_classificar = indexa_textos_classificarBllModule(session=session)
         return indexa_textos_classificar.indexa_textos_classificar()
         
     except Exception as e:
@@ -109,10 +108,10 @@ async def busca_textos( id:int,#passar 0 se não quiser filtrar por id
                         data_final:str ,#passar "" se não quiser filtrar por data_final
                         similaridade_minima:float,#passar 0 se não quiser filtrar por similaridade mínima valor deve estar entre 0 e 1
                         collection_name:str,#obrigatório final ou train define se vai buscar na coleção ja treinada ou de textos a classificar
-                        session: Session = Depends(get_session_db)  ):        
+                        session: Session = Depends(get_session_db)):        
 
     try:             
-        busca_textoBLL = busca_textoBLLModule(embeddingsBllModule.get_bllEmbeddings(),session)
+        busca_textoBLL = busca_textoBLLModule(embeddingsBllModule.get_bllEmbeddings(session=session),session=session)
         return busca_textoBLL.busca_texto(id=id,
                                           codclasse=codclasse,
                                           texto=texto,

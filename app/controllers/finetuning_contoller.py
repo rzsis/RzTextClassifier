@@ -8,7 +8,7 @@ import common
 from fastapi import APIRouter
 from common import get_session_db
 from sqlalchemy.orm import Session
-from bll.DAPT_bgem3_Bll import DAPT_bge_m3 as DAPT_bge_m3Module
+from bll.dapt.DAPT_bgem3_Bll import DAPT_bge_m3 as DAPT_bge_m3Module
 
 router = APIRouter()
    

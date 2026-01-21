@@ -1,3 +1,5 @@
+#onnx_semantic_validation.py
+
 from __future__ import annotations
 
 from typing import List, Tuple
@@ -6,7 +8,7 @@ import onnxruntime as ort
 from transformers import AutoTokenizer
 
 
-class OnnxSemanticValidator:
+class OnnxSemanticValidator:  
     """
     Validação de busca semântica usando ONNX Runtime.
     Projetado para ser chamado após a conversão do modelo.
@@ -16,7 +18,7 @@ class OnnxSemanticValidator:
         self,
         onnx_path: str,
         model_path: str,
-        max_length: int = 512,
+        max_length: int 
     ):
         self.onnx_path = onnx_path
         self.model_path = model_path
@@ -51,24 +53,34 @@ class OnnxSemanticValidator:
     # =========================
 
     def embed(self, texts: List[str]) -> np.ndarray:
-        encoded = self.tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="np",
-        )
+        BATCH = 1
+        all_embeddings = []
 
-        outputs = self.session.run(
-            ["sentence_embedding"],
-            {
-                "input_ids": encoded["input_ids"].astype(np.int64),
-                "attention_mask": encoded["attention_mask"].astype(np.int64),
-            },
-        )
+        for i in range(0, len(texts), BATCH):
+            chunk = texts[i : i + BATCH]
 
-        embeddings = outputs[0]
-        return self._l2_normalize(embeddings)
+
+            encoded = self.tokenizer(
+                chunk,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="np",
+            )
+
+            outputs = self.session.run(
+                ["sentence_embedding"],
+                {
+                    "input_ids": encoded["input_ids"].astype(np.int64),
+                    "attention_mask": encoded["attention_mask"].astype(np.int64),
+                },
+            )
+
+            emb = outputs[0][: len(chunk)]  # type: ignore # remove padding
+            all_embeddings.append(emb)
+
+        return np.vstack(all_embeddings)
+
 
     @staticmethod
     def _l2_normalize(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:

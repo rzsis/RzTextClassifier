@@ -139,7 +139,7 @@ class ClassificaTextosPendentesBll:
 
         print_with_time(f"Iniciando processamento para classificação de textos a classificar pendentes...")
 
-        embeddingsBllModule.initBllEmbeddings(self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
+        embeddingsBllModule.initBllEmbeddings(session=self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
                 
         #Obtem dados do banco que falta classificar
         data = self._get_data_to_classify() 

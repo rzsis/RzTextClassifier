@@ -14,6 +14,7 @@ from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllMo
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
 import gpu_utils as gpu_utilsModule
+import localconfig
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 import logger
 from collections.abc import Sequence
@@ -38,7 +39,7 @@ class indexa_textos_classificarBll:
             self.min_similars = 3
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
-            embeddingsBllModule.initBllEmbeddings(self.session)
+            embeddingsBllModule.initBllEmbeddings(session=self.session)
             self.qdrant_utils = Qdrant_UtilsModule()
             self.qdrant_client = self.qdrant_utils.get_client()
             self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train")
@@ -171,7 +172,7 @@ class indexa_textos_classificarBll:
 
         # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
         processed_data = []
-        batch_size = 100  #Ajustado para a 5070 ti 16gb com float16
+        batch_size = int(localconfig.get("batch_size"))  #no bge-m3 original o batch estava com 100 porem no bge m3 onnx com limitações de gpu e memória foi reduzido para 2
 
         for i in tqdm(range(0, len(data), batch_size), desc="Gerando embeddings em batches"):
             batch = data[i:i + batch_size]

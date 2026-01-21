@@ -17,7 +17,9 @@ import common
 import logger
 import bll.embeddingsBll as bllEmbeddings
 from gpu_utils import GpuUtils  as gpu_utilsModule
-import bll.export_bge_m3_to_onnx as bllExportBgeM3ToOnnx    
+import bll.onxx_utils.export_bge_m3_to_onnx as bllExportBgeM3ToOnnx    
+
+#os.system("clear")
 
 appName = "RzTextClassifier"
 # 1) Instala os hooks globais o quanto antes
@@ -45,10 +47,13 @@ common._db.test_connection()
 gpu_utilsModule().print_gpu_info()
 
 
-
 if __name__ == "__main__":
-   # bllExportBgeM3ToOnnx.execute()    isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
+    # Melhorias
+    # Garantir que ao exportar para ONNX o modelo seja o bge original e não o convertido ONNX
+    # Gerar um readme com explicacoes do modelo exportado
+
+   # bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
     import uvicorn
     HTTP_PORT = int(localconfig.get("http_port"))

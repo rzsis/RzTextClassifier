@@ -51,7 +51,7 @@ class sugere_textos_classificarBll:
             self.similarity_threshold = 0.96
             self.clusters = {} # Cache: {id_base: [{"id": id_similar, "score": score}, ...]}
             # Inicializa embeddings
-            embeddingsBllModule.initBllEmbeddings(self.session)
+            embeddingsBllModule.initBllEmbeddings(session=self.session)
 
             self.qdrant_utils = Qdrant_UtilsModule()
             self.textos_classificar_collection_name = self.qdrant_utils.get_collection_name("train")             
@@ -559,7 +559,7 @@ class sugere_textos_classificarBll:
         try:
             #primeiro deve indexar tudo no qdrant para depois fazer a busca
             inicio = time.time()
-            indexa_textos_classificarBll = indexa_textos_classificarBllModule(self.session)
+            indexa_textos_classificarBll = indexa_textos_classificarBllModule(session=self.session)
             indexa_textos_classificarBll.indexa_textos_classificar()
 
             print_with_time(f"Iniciando busca de textos duplicados...")
