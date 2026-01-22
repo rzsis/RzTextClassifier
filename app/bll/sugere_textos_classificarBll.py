@@ -596,26 +596,25 @@ class sugere_textos_classificarBll:
             self._update_textos_classificar()
             self.session.commit()
             tempo_decorrido_min = (time.time() - inicio) / 60          
-            sucessMessage = f"""No nível {NivelBuscaSimilar} foram inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: 
-                                {tempo_decorrido_min:.2f} minutos \n""" + pSucessMessage
+            sucessMessage = f"""No Nível {NivelBuscaSimilar} foram inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"""
+            totalSucessMessage = f"{pSucessMessage} \n{sucessMessage}"            
             
             itens_restantes = self._get_qtd_textos_falta_buscar_similar()
             
             #aqui caso faltem itens e o nivel de busca seja menor que 5 faz uma nova chamada recursiva para buscar mais similares
             if (itens_restantes > 0) and (ContadorEntrada <= NivelBuscaSimilar): 
                 print_with_time(f"{sucessMessage} no nível {ContadorEntrada}, buscando próximos níveis...")                   
-                self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1,pSucessMessage=sucessMessage)        
+                self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1,pSucessMessage=totalSucessMessage)        
                 itens_restantes = self._get_qtd_textos_falta_buscar_similar()
                 
-            print_with_time(sucessMessage)
+            print_with_time(totalSucessMessage)
             return {
                 "status": "OK",
-                "mensagem": sucessMessage,
+                "mensagem": totalSucessMessage,
                 "restante": f"{itens_restantes}"
             }
         except Exception as e:
             errorMessage = f"Erro ao processar textos para busca de similares: {e}"
-            print_error(errorMessage)
             return {
                 "status": "ERROR",
                 "processados": errorMessage,

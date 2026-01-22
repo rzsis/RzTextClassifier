@@ -1,4 +1,5 @@
 # embeddingsBll.py
+import time
 import numpy as np
 from db_utils import Session
 from typing import  Dict, List, Optional,Union
@@ -69,6 +70,8 @@ class EmbeddingsBll:
         texts: Union[str, List[str]],
         ids: Optional[Union[int, List[Optional[int]]]] = None
     ) -> Union[Optional[np.ndarray], List[Optional[np.ndarray]]]:
+        if self.torch_model is None:
+            raise RuntimeError("generate_embeddings requer GPU. Use generate_embedding (ONNX) em ambiente CPU.")
 
         # ---- modo single/batch ----
         if isinstance(texts, str):
@@ -153,8 +156,13 @@ class EmbeddingsBll:
     #Gera embedding para um texto usando o ONNX (individual)
     def generate_embedding(self, text: str, Id: Optional[int]) -> Optional[np.ndarray]: 
         try:
+            inicio = time.time()
             if not text or not isinstance(text, str):
                 return None
+
+            if self.tokenizer is None:
+                raise RuntimeError("Tokenizer não carregado. Chame load_model_and_tokenizer().")
+            
 
             clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127).strip()
             if not clean_text:
@@ -172,11 +180,16 @@ class EmbeddingsBll:
             ) # type: ignore
 
             ort_inputs = {
-                "input_ids": inputs["input_ids"],
-                "attention_mask": inputs["attention_mask"],
+                    "input_ids": inputs["input_ids"],
+                    "attention_mask": inputs["attention_mask"],
             }
 
             embedding = self.onnx_session.run(None, ort_inputs)[0]
+            fim = time.time()
+
+            tempo_decorrido_min = (time.time() - inicio) / 60          
+            print_with_time(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
+
             return embedding[0].astype("float32") # type: ignore
         except Exception as e:
             raise RuntimeError(f"Erro ONNX ao gerar embedding para ID {Id}: {e}")     
@@ -189,43 +202,44 @@ class EmbeddingsBll:
             onnx_file_name = f"{model_path}/bge-m3-dense.onnx"
             print_with_time(f"[INFO] Carregando tokenizer e modelo de: {onnx_file_name}")                        
 
-            # 1. Carrega o tokenizer (essencial!)
+            # 1. Carrega o tokenizer (essencial!) para lote
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_path,
                 local_files_only=True,
             )
-
-            # ===== Carrega modelo PyTorch para indexação em lote (GPU) =====
-            # OBS: aqui usamos o modelo HF original (não ONNX).
-            hf_model_path = self.localconfig.getModelPath()
-
-            base_model = AutoModel.from_pretrained(
-                hf_model_path,
-                local_files_only=True,
-                torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
-            )
-
-            self.torch_model =  dense_embedding_wrapperModule.DenseEmbeddingTorchWrapper(base_model).to(self.device).eval()
-
-            # TF32 ajuda bastante em GPUs modernas (mantém precisão boa pra embeddings)
+            
             if self.device.type == "cuda":
+                # ===== Carrega modelo PyTorch para indexação em lote (GPU) =====
+                # OBS: aqui usamos o modelo HF original (não ONNX).
+
+                base_model = AutoModel.from_pretrained(
+                    model_path,
+                    local_files_only=True,
+                    torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
+                )
+
+                self.torch_model =  dense_embedding_wrapperModule.DenseEmbeddingTorchWrapper(base_model).to(self.device).eval()
+
+                # TF32 ajuda bastante em GPUs modernas (mantém precisão boa pra embeddings)            
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True    
+            else:   
+                self.torch_model = None  # garantee None se não for CUDA
+
 
             if not os.path.isfile(onnx_file_name):
                 raise FileNotFoundError(f"Arquivo ONNX não encontrado: {onnx_file_name}")            
 
             providers = (
                 ["CUDAExecutionProvider", "CPUExecutionProvider"]
-                if self.device.type == "cuda"
-                else ["CPUExecutionProvider"]
+                if self.device.type == "cuda" else ["CPUExecutionProvider"]
             )
 
             self.onnx_session = ort.InferenceSession(
-                onnx_file_name,
-                providers=providers
+                    onnx_file_name,
+                    providers=providers
             )                                  
-            
+                
             # Verifica inputs
             input_names = {i.name for i in self.onnx_session.get_inputs()}
             if input_names != {"input_ids", "attention_mask"}:

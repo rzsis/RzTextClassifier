@@ -16,6 +16,7 @@ from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sug
 from bll.move_sugestao_treinamentoBLL import move_sugestao_treinamentoBLL as move_sugestao_treinamentoBllModule
 from bll.indexa_textos_classificarBll import indexa_textos_classificarBll as indexa_textos_classificarBllModule
 from bll.busca_textoBLL import busca_textoBLL as busca_textoBLLModule
+from bll.indexa_textos_treinamentoBll import indexa_textos_treinamentoBll as indexa_textos_treinamentoBllModule
 
 router = APIRouter()
    
@@ -65,7 +66,7 @@ async def sugere_textos_classificar(NivelBuscaSimilar:int=0,
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
     
-#endpoint para sugere textos a classificar
+#endpoint para indexar textos a classificar
 @router.post("/indexa_textos_classificar")
 async def indexa_textos_classificar(session: Session = Depends(get_session_db)  ):        
     try:     
@@ -74,10 +75,21 @@ async def indexa_textos_classificar(session: Session = Depends(get_session_db)  
         return indexa_textos_classificar.indexa_textos_classificar()
         
     except Exception as e:
-        return HTTPException(status_code=500, detail=f"Erro em indexa_textos_classificar : {str(e)}")        
+        return HTTPException(status_code=500, detail=f"Erro em indexa_textos_classificar : {str(e)}")      
 
+#endpoint para indexar textos a treinamento
+@router.post("/indexa_textos_treinamento")
+async def indexa_textos_treinamento(session: Session = Depends(get_session_db)  ):        
+    try:     
+        embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado          
+        indexa_textos_treinamento = indexa_textos_treinamentoBllModule(session=session)
+        return indexa_textos_treinamento.indexa_textos_treinamento()
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em indexa_textos_treinamento : {str(e)}")             
+    
 
-#endpoint para sugere textos a classificar
+#endpoint para mover sugestão de treinamento
 @router.post("/move_sugestao_treinamento")
 async def move_sugestao_treinamento(idbase:int,
                                     idsimilar:int,
@@ -96,7 +108,7 @@ async def move_sugestao_treinamento(idbase:int,
                                                                 mover_com_colidencia=mover_com_colidencia)
         
     except Exception as e:
-        return HTTPException(status_code=500, detail=f"Erro em sugere_textos_classificar : {str(e)}")    
+        return HTTPException(status_code=500, detail=f"Erro em move_sugestao_treinamento : {str(e)}")    
     
 
 #endpoint para buscar textos treinamento

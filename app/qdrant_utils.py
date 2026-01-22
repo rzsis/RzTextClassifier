@@ -115,58 +115,54 @@ class Qdrant_Utils:
         except Exception as e:
             raise RuntimeError(f"Erro criando create_collection no banco vetorial: {e}")
 
-    #Força o Qdrant a reindexar a coleção imediatamente.
-    #Ele compacta segmentos e recria índices HNSW se necessário.
-    def force_reindex(self, collection_name: str) -> bool:   
+        #Força o Qdrant a reindexar a coleção imediatamente.
+        #Ele compacta segmentos e recria índices HNSW se necessário.
+    def force_reindex(self, collection_name: str) -> bool:
         try:
-            # 1. Verifica status atual
             timeout = 300
-            info = self._qdrant_client.get_collection(collection_name)
-            total_points = info.points_count or 0
-            indexed_points = info.indexed_vectors_count or 0
-            
-            if indexed_points >= total_points:            
-                return True
+            stable_window = 20  # segundos sem mudança
+            last_indexed = -1
+            stable_since = None
 
-            print_with_time(f"Forçando reindexação: {indexed_points}/{total_points} vetores indexados.")
+            print_with_time("Forçando reindexação da coleção...")
 
-            # 2. Define threshold = 0 (acumula tudo sem indexar imediatamente)
             self._qdrant_client.update_collection(
                 collection_name=collection_name,
-                optimizer_config={
-                    "indexing_threshold": 0
-                }
+                optimizer_config={"indexing_threshold": 0}
             )
 
-            # 3. Volta o threshold para um valor baixo → força criação do índice
             self._qdrant_client.update_collection(
                 collection_name=collection_name,
-                optimizer_config={
-                    "indexing_threshold": 10000  # valor pequeno o suficiente para disparar imediatamente
-                }
+                optimizer_config={"indexing_threshold": 10000}
             )
 
             start_time = time.time()
-            
+
             while True:
                 if time.time() - start_time > timeout:
-                    print_with_time("\nTimeout atingido ao aguardar indexação.")
+                    print_with_time("Timeout aguardando estabilização da indexação.")
                     return False
 
-                current = self._qdrant_client.get_collection(collection_name)
-                indexed = current.indexed_vectors_count or 0
-                total = current.points_count or 0
+                info = self._qdrant_client.get_collection(collection_name)
+                indexed = info.indexed_vectors_count or 0
 
-                if indexed >= total and current.status == "green":
-                    print_with_time(f"\nIndexação concluída! {indexed}/{total} vetores indexados.")
-                    return True
-              
+                if indexed == last_indexed:
+                    if stable_since is None:
+                        stable_since = time.time()
+                    elif time.time() - stable_since >= stable_window:
+                        print_with_time(
+                            f"Indexação estabilizada em {indexed} vetores."
+                        )
+                        return True
+                else:
+                    stable_since = None
+                    last_indexed = indexed
+
                 time.sleep(2)
 
         except Exception as e:
-            print_with_time(f"\nErro ao forçar reindexação: {e}")
+            print_with_time(f"Erro ao forçar reindexação: {e}")
             return False
-
 
     # Busca embeddings similares no qdrant
     # exclusion_list é uma lista de Ids que devem ser excluidos da busca de similaridade pois não faz sentido eu procurar os proprios ids como similares deles mesmos
