@@ -89,5 +89,8 @@ def getEmbeddingsTrain() -> str:
     return os.path.join(__configReaded["embeddingsTrain"], getModelName())
 
 def get(chave) -> str:
+    if chave not in __configReaded:
+        raise RuntimeError(f"Chave '{chave}' não encontrada no arquivo de configuração.")    
+    
     return __configReaded[chave]
 

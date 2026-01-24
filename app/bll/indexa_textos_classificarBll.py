@@ -1,3 +1,4 @@
+#indexa_textos_classificarBll.py
 from ast import Dict, List
 import os
 from pathlib import Path
@@ -96,6 +97,21 @@ class indexa_textos_classificarBll:
             raise RuntimeError(f"Erro ao obter dados do banco em textos_classificar: {e}")
 
     #marca os textos indexados no qdrant como indexados
+    def _mark_ids_as_indexado(self, id: list[int]):
+        try:
+            query = """
+                UPDATE textos_classificar
+                SET Indexado = true
+                WHERE id IN :ids
+            """
+            self.session.execute(text(query), {"ids": tuple(id)})
+            self.session.commit()                       
+        except Exception as e:
+            print_with_time(f"Erro ao marcar id {id} como indexado: {e}")
+            self.session.rollback()
+
+
+    #marca os textos indexados no qdrant como indexados
     def _mark_lista_as_indexado(self, processados: list[dict]):
         try:
             # Filtra apenas os registros com UpInsertOk=True
@@ -157,6 +173,7 @@ class indexa_textos_classificarBll:
     #pega todos os textos pendentes que o sistema não conseguiu classifcar ou gerou médias ou quantidades
     #indexa no qdrant para buscar similares e definir uma busca mais precisa pro futuro
     def indexa_textos_classificar(self) -> dict:
+        total_indexados = 0
         inicio = time.time()
         print_with_time(f"Iniciando indexação de textos a classificar...")
         self.clusters = {} # Reseta cache
@@ -171,10 +188,11 @@ class indexa_textos_classificarBll:
             }
 
         # Acumula embeddings em uma lista de dicionários com Id, Embedding e UpInsertOk
-        processed_data = []
         batch_size = int(localconfig.get("batch_size"))  #no bge-m3 original o batch estava com 100 porem no bge m3 onnx com limitações de gpu e memória foi reduzido para 2
 
         for i in tqdm(range(0, len(data), batch_size), desc="Gerando embeddings em batches"):
+            ids_invalidos = []            
+            processed_data = []
             batch = data[i:i + batch_size]
             texts = [row['Text'] for row in batch]
             ids = [row['id'] for row in batch]
@@ -183,6 +201,11 @@ class indexa_textos_classificarBll:
                 embeddings = embeddingsBllModule.bllEmbeddings.generate_embeddings(texts, ids)
                 
                 for j, embedding in enumerate(embeddings):
+                # ✅ FILTRO OBRIGATÓRIO
+                    if embedding is None:
+                        ids_invalidos.append(ids[j]) 
+                        continue                    
+
                     processed_data.append({
                         'Id': ids[j],
                         'Embedding': embedding,
@@ -191,12 +214,17 @@ class indexa_textos_classificarBll:
                 
               
                 self.gpu_utils.clear_gpu_cache() # Clear cache a cada batch 
-                        
-                processed_data = self._insert_text_list_qdrant(processed_data)
+                if processed_data:                        
+                    processed_data = self._insert_text_list_qdrant(processed_data)
                
                 self._mark_lista_as_indexado(processed_data) # Marca como indexado apenas os textos com UpInsertOk=True no lote atual
+                total_indexados += len([item for item in processed_data if item['UpInsertOk']]) + len(ids_invalidos)
+
+                if ids_invalidos:
+                    self._mark_ids_as_indexado(ids_invalidos)                    
 
                 processed_data = []  # Reseta a lista após o processamento do batch
+                ids_invalidos = []  # Reseta a lista de ids inválidos após o processamento do batch                    
 
             except Exception as e:
                 print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
@@ -206,7 +234,7 @@ class indexa_textos_classificarBll:
         self.qdrant_utils.force_reindex(self.textos_classificar_collection_name)
 
         tempo_decorrido_min = (time.time() - inicio) / 60
-        sucessMessage = f"Indexados {len([item for item in processed_data if item['UpInsertOk']])} textos pendentes no Qdrant, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
+        sucessMessage = f"Indexados {total_indexados} textos pendentes no Qdrant, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
         print_with_time(sucessMessage)
         return {
             "status": "OK",

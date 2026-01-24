@@ -162,11 +162,11 @@ class sugere_textos_classificarBll:
             return 0    
 
     #processa os textos duplicados encontrados inserindo na sugestao_textos_classificar 
-    def _processa_textos_duplicados(self,data):
+    def _processa_textos_duplicados(self,data) -> str:
         try:
             if len(data) == 0:
                 print_with_time("Sem textos duplicados para processar")
-                return
+                return ""
                            
             qtd_inserido_similares = 0
             qtd_inserido = 0
@@ -219,9 +219,13 @@ class sugere_textos_classificarBll:
                     self._mark_as_buscou_igual(lista_marcar_duplicados)
                     self.session.commit()
 
-            print_with_time(f"Inseridos {qtd_inserido} textos duplicados + altamente similares {qtd_inserido_similares}")
-        except Exception as e:
-            print_with_time(f"Erro ao processar em _processa_textos_duplicados: {e}")
+            retorno = f"Inseridos {qtd_inserido} textos duplicados + altamente similares {qtd_inserido_similares}"
+            print_with_time(retorno)
+            return retorno
+        except Exception as e:  
+            retorno = f"Erro ao processar textos duplicados: {e}"
+            print_with_time(retorno)
+            return retorno
 
 
     #Obtem os textos que faltam buscar similares ou seja textos que ainda não foram inseridos em sugestao_textos_classificar
@@ -567,7 +571,7 @@ class sugere_textos_classificarBll:
             self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem a lista atual ja inserida em sugestao_textos_classificar ja inserido no banco
             if (ContadorEntrada == 1):
                 data = self._get_lista_textos_duplicados()
-                self._processa_textos_duplicados(data)                     
+                pSucessMessage += self._processa_textos_duplicados(data)                     
 
             print_with_time(f"Iniciando busca de textos similares Nivel {ContadorEntrada}...")
             data = self._get_textos_falta_buscar_similar()
@@ -596,7 +600,7 @@ class sugere_textos_classificarBll:
             self._update_textos_classificar()
             self.session.commit()
             tempo_decorrido_min = (time.time() - inicio) / 60          
-            sucessMessage = f"""No Nível {NivelBuscaSimilar} foram inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"""
+            sucessMessage = f"""No Nível {ContadorEntrada} foram inseridos {self.similares_inseridos} sugestões de textos similares, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"""
             totalSucessMessage = f"{pSucessMessage} \n{sucessMessage}"            
             
             itens_restantes = self._get_qtd_textos_falta_buscar_similar()

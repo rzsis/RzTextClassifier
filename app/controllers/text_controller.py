@@ -56,7 +56,7 @@ async def classifica_textos_pendentes(session: Session = Depends(get_session_db)
 #endpoint para sugere textos a classificar
 @router.post("/sugere_textos_classificar")
 async def sugere_textos_classificar(NivelBuscaSimilar:int=0,
-    session: Session = Depends(get_session_db)  ):        
+    session: Session = Depends(get_session_db)):        
 
     try:     
         embeddingsBllModule.initBllEmbeddings(session=session)  # inicializa bllEmbeddings se ainda não foi inicializado          

@@ -156,7 +156,7 @@ class EmbeddingsBll:
     #Gera embedding para um texto usando o ONNX (individual)
     def generate_embedding(self, text: str, Id: Optional[int]) -> Optional[np.ndarray]: 
         try:
-            inicio = time.time()
+            #inicio = time.time()
             if not text or not isinstance(text, str):
                 return None
 
@@ -176,7 +176,7 @@ class EmbeddingsBll:
                 return_tensors="np",
                 truncation=True,
                 max_length=self.max_length,
-                padding="max_length",
+                padding=True,
             ) # type: ignore
 
             ort_inputs = {
@@ -187,8 +187,8 @@ class EmbeddingsBll:
             embedding = self.onnx_session.run(None, ort_inputs)[0]
             fim = time.time()
 
-            tempo_decorrido_min = (time.time() - inicio) / 60          
-            print_with_time(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
+            #tempo_decorrido_min = (time.time() - inicio) / 60          
+            #print_with_time(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
 
             return embedding[0].astype("float32") # type: ignore
         except Exception as e:
@@ -200,7 +200,9 @@ class EmbeddingsBll:
             model_path  = self.localconfig.getModelPath()
             # ===== Carrega modelo ONNX para inferência individual =====            
             onnx_file_name = f"{model_path}/bge-m3-dense.onnx"
-            print_with_time(f"[INFO] Carregando tokenizer e modelo de: {onnx_file_name}")                        
+            print_with_time(f"[INFO] Carregando tokenizer HF de: {model_path}")
+
+            print_with_time(f"[INFO] Carregando modelo ONNX de: {onnx_file_name}")          
 
             # 1. Carrega o tokenizer (essencial!) para lote
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -211,7 +213,7 @@ class EmbeddingsBll:
             if self.device.type == "cuda":
                 # ===== Carrega modelo PyTorch para indexação em lote (GPU) =====
                 # OBS: aqui usamos o modelo HF original (não ONNX).
-
+                print_with_time(f"[INFO] Carregando modelo PyTorch para GPU de: {model_path}")
                 base_model = AutoModel.from_pretrained(
                     model_path,
                     local_files_only=True,
@@ -224,8 +226,8 @@ class EmbeddingsBll:
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True    
             else:   
-                self.torch_model = None  # garantee None se não for CUDA
-
+                self.torch_model = None  # garantee None se não for CUDA    
+            
 
             if not os.path.isfile(onnx_file_name):
                 raise FileNotFoundError(f"Arquivo ONNX não encontrado: {onnx_file_name}")            
