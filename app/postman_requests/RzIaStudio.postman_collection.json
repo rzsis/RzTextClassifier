@@ -7,6 +7,265 @@
 	},
 	"item": [
 		{
+			"name": "Qdrant",
+			"item": [
+				{
+					"name": "qdrant_delete_id",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\"points\": [34397493]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://10.1.1.95:6333/collections/v146_textos_final/points/delete",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"95"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_final",
+								"points",
+								"delete"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "qdrant_get_collections",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "qdrant_collection_info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections/v146_textos_classificar",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_classificar"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "qdrant_collection_remove",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections/v146_textos_classificar",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_classificar"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "qdrant_get_id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections/v146_textos_final/points/34990321",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_final",
+								"points",
+								"34990321"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "backup",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections/v146_textos_classificar/snapshots",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_classificar",
+								"snapshots"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "checkBackup",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://10.1.1.53:6333/collections/v146_textos_classificar/snapshots",
+							"protocol": "http",
+							"host": [
+								"10",
+								"1",
+								"1",
+								"53"
+							],
+							"port": "6333",
+							"path": [
+								"collections",
+								"v146_textos_classificar",
+								"snapshots"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore_SnapShot",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "CriaColecao",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "RzIaStudio_Interface",
+			"item": [
+				{
+					"name": "ImportarXLS",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "https://rziastudiobeta.rzsistemas.com.br/api/ImportaXls/ImportaXLS?TabelaSalvar=C",
+							"protocol": "https",
+							"host": [
+								"rziastudiobeta",
+								"rzsistemas",
+								"com",
+								"br"
+							],
+							"path": [
+								"api",
+								"ImportaXls",
+								"ImportaXLS"
+							],
+							"query": [
+								{
+									"key": "TabelaSalvar",
+									"value": "C"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "ReprocessarNucleo",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "https://rziastudiobeta.rzsistemas.com.br/api/ImportaXls/ExtrairNucleoTexto?TabelaSalvar=C",
+							"protocol": "https",
+							"host": [
+								"rziastudiobeta",
+								"rzsistemas",
+								"com",
+								"br"
+							],
+							"path": [
+								"api",
+								"ImportaXls",
+								"ExtrairNucleoTexto"
+							],
+							"query": [
+								{
+									"key": "TabelaSalvar",
+									"value": "C"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "generateembeddings",
 			"request": {
 				"method": "POST",
@@ -40,13 +299,13 @@
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://10.1.1.95:5020/classificaTexto?texto=INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se.",
+					"raw": "http://10.1.1.53:5020/classificaTexto?texto=ATO ORDINATORIOIntimacao realizada no sistema eproc.O ato refere-se ao seguinte evento: {evento} {data} - Juntada de certidao",
 					"protocol": "http",
 					"host": [
 						"10",
 						"1",
 						"1",
-						"95"
+						"53"
 					],
 					"port": "5020",
 					"path": [
@@ -55,7 +314,7 @@
 					"query": [
 						{
 							"key": "texto",
-							"value": "INTIMAÇÃO CAPTURADA EM: {data} Número do processo: {nproc} Disponibilização: {data} Pesquisado: {pessoa} - SC020875 Tribunal Sistema: TJRS-EPROC-1ª instância Prazo: 15 DIAS. Prazo final: Intimado: Parte: Autor {pessoa} {CPF}) X Réu HIPERCARD BANCO MULTIPLO {empresa} {CPF}) Vara Juízo: - Tipo : EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA INTIMAÇÃO LIDA SEM A ABERTURA DO PRAZO - AGUARDA PUBLICAÇÃO NO DJEN EXPEDIDA CERTIFICADA A INTIMAÇÃO ELETRÔNICA - SENTENÇA REFER. AO {evento}(RÉU - HIPERCARD BANCO MULTIPLO {empresa}. PRAZO: 15 DIAS STATUS: AGUARD. ABERTURA DIÁRIO DE JUSTIÇA ELETRÔNICO NACIONAL: ENVIADO EM {data} PARA DISPONIBILIZAÇÃO EM {data} HOMOLOGADA A TRANSAÇÃO 35 - SENT1 print Documento: {CPF} Poder Judiciário Tribunal de Justiça do Estado do Rio Grande do Sul 1ª Vara Judicial da {comarca} {cidade}, 70, Fórum - Bairro: Centro - {CEP} {{fone}} - {{fone}} (Whatsapp) - {{email}} PROCEDIMENTO COMUM CÍVEL {nproc} RS AUTOR : {pessoa} RÉU : HIPERCARD BANCO MULTIPLO {empresa}. SENTENÇA HOMOLOGO o acordo firmado ( {evento} ), para que surta seus legais e jurídicos efeitos, julgando extinto o feito, com resolução de mérito, com base no art. 487, inc. III, alínea b, do CPC. Não são devidas custas processuais remanescentes, uma vez que o acordo foi homologado antes da sentença. Com o trânsito em julgado, arquive-se com baixa, sendo inviável a manutenção do feito ativo em cartório até que seja alcançado o termo final do pactuado entre as partes. Isso porque, em caso de eventual descumprimento do acordo, deverá ser instaurada a fase de cumprimento de sentença, visto se tratar de novo negócio jurídico, decorrente da novação da dívida. Nesse caso, deverá haver uma nova relação processual para que o executado possa impugnar os termos desse acordo, visto que na presente execução ele não terá recurso cabível, pois já decorrido todos os prazos para embargos impugnações. Partes intimadas eletronicamente via sistema E-proc. Decorrido o prazo recursal sem manifestação, baixe-se."
+							"value": "ATO ORDINATORIOIntimacao realizada no sistema eproc.O ato refere-se ao seguinte evento: {evento} {data} - Juntada de certidao"
 						}
 					]
 				}
@@ -85,12 +344,12 @@
 			"response": []
 		},
 		{
-			"name": "sugere_textos_classificar",
+			"name": "indexa_textos_classificar",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://10.1.1.95:5020/sugere_textos_classificar",
+					"raw": "http://10.1.1.95:5020/indexa_textos_classificar",
 					"protocol": "http",
 					"host": [
 						"10",
@@ -100,7 +359,57 @@
 					],
 					"port": "5020",
 					"path": [
+						"indexa_textos_classificar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "indexa_textos_treinamento",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/indexa_textos_treinamento",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"indexa_textos_treinamento"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "sugere_textos_classificar",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.96:5020/sugere_textos_classificar?NivelBuscaSimilar=5",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"96"
+					],
+					"port": "5020",
+					"path": [
 						"sugere_textos_classificar"
+					],
+					"query": [
+						{
+							"key": "NivelBuscaSimilar",
+							"value": "5"
+						}
 					]
 				}
 			},
@@ -112,7 +421,7 @@
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://10.1.1.95:5020/sugere_textos_classificar",
+					"raw": "http://10.1.1.95:5020/move_sugestao_treinamento?idbase=34441916&idsimilar=37175311&codclasse=1",
 					"protocol": "http",
 					"host": [
 						"10",
@@ -122,7 +431,21 @@
 					],
 					"port": "5020",
 					"path": [
-						"sugere_textos_classificar"
+						"move_sugestao_treinamento"
+					],
+					"query": [
+						{
+							"key": "idbase",
+							"value": "34441916"
+						},
+						{
+							"key": "idsimilar",
+							"value": "37175311"
+						},
+						{
+							"key": "codclasse",
+							"value": "1"
+						}
 					]
 				}
 			},
@@ -173,91 +496,12 @@
 			"response": []
 		},
 		{
-			"name": "qdrant_get_collections",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://10.1.1.95:6333/collections",
-					"protocol": "http",
-					"host": [
-						"10",
-						"1",
-						"1",
-						"95"
-					],
-					"port": "6333",
-					"path": [
-						"collections"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "qdrant_collection_info",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://10.1.1.95:6333/collections/v146_textos_classificar",
-					"protocol": "http",
-					"host": [
-						"10",
-						"1",
-						"1",
-						"95"
-					],
-					"port": "6333",
-					"path": [
-						"collections",
-						"v146_textos_classificar"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "qdrant_get_id",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://10.1.1.95:6333/collections/v146_textos_final/points/34397493",
-					"protocol": "http",
-					"host": [
-						"10",
-						"1",
-						"1",
-						"95"
-					],
-					"port": "6333",
-					"path": [
-						"collections",
-						"v146_textos_final",
-						"points",
-						"34397493"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "qdrant_delete_get_id",
+			"name": "edit_texto_treinamento",
 			"request": {
 				"method": "POST",
 				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n\"points\": [34397493]\r\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
 				"url": {
-					"raw": "http://10.1.1.95:6333/collections/v146_textos_final/points/delete",
+					"raw": "http://10.1.1.95:5020/edit_texto_treinamento?id=1&codClasse=1",
 					"protocol": "http",
 					"host": [
 						"10",
@@ -265,12 +509,93 @@
 						"1",
 						"95"
 					],
-					"port": "6333",
+					"port": "5020",
 					"path": [
-						"collections",
-						"v146_textos_final",
-						"points",
-						"delete"
+						"edit_texto_treinamento"
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": "1"
+						},
+						{
+							"key": "codClasse",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "busca_textos",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/busca_textos?id=0&codclasse=0&texto=NÃO&data_inicial=&data_final&similaridade_minima=50&collection_name=train",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"busca_textos"
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": "0"
+						},
+						{
+							"key": "codclasse",
+							"value": "0"
+						},
+						{
+							"key": "texto",
+							"value": "NÃO"
+						},
+						{
+							"key": "data_inicial",
+							"value": ""
+						},
+						{
+							"key": "data_final",
+							"value": null
+						},
+						{
+							"key": "similaridade_minima",
+							"value": "50"
+						},
+						{
+							"key": "collection_name",
+							"value": "train"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "dapt_bgem3",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.95:5020/dapt_bgem3",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"95"
+					],
+					"port": "5020",
+					"path": [
+						"dapt_bgem3"
 					]
 				}
 			},
