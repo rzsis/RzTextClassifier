@@ -35,7 +35,7 @@ class move_sugestao_treinamentoBLL:
             self.min_similarity =  98.5
             self.check_collidingBll = check_collidingBLLModule(session)            
             self.salva_log_alteracoesBll = salva_log_AlteracoesBllModule(session)            
-            embeddingsBllModule.initBllEmbeddings(1,self.session)
+            embeddingsBllModule.initBllEmbeddings(self.session)
             self.embeddingsBll = embeddingsBllModule.bllEmbeddings
 
         except Exception as e:
