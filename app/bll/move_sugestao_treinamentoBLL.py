@@ -147,11 +147,14 @@ class move_sugestao_treinamentoBLL:
         try:
             query = f"SELECT Classe from classes where codclasse = :codclasse"
 
-            result = self.session.execute(text(query),{"codclasse":codclasse}).mappings().all()
+            result = self.session.execute(text(query),{"codclasse":codclasse}).mappings().first()
             if not result :
-                raise RuntimeError(f"Erro em _get_classe CodClasse {codclasse} não encontrada")                
+                raise ValueError(f"Erro em _get_classe CodClasse {codclasse} não encontrada")                
             
-            return result[0]["Classe"]
+            return result["Classe"]
+        
+        except ValueError:
+            raise  # mantém erro limpo
         
         except Exception as e:
             raise RuntimeError(f"Erro ao obter classe em _get_classe: {e}")       
@@ -483,7 +486,7 @@ class move_sugestao_treinamentoBLL:
             self.session.commit()#grava as mudanças no banco de dados MariaDb idéia é que tudo seja feito numa transação só
 
             total_movido = len(lista_iguais) + len(lista_similares)
-            sucessMessage = f"Movidos {total_movido} registros para treinamento e Qdrant final"
+            sucessMessage = f"Movidos {total_movido} registros para treinamento e Modelo de IA"
             print_with_time(sucessMessage)
             return {
                 "status": "OK",
