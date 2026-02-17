@@ -16,6 +16,7 @@ from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
 from bll.salva_log_AlteracoesBll import salva_log_AlteracoesBll as salva_log_AlteracoesBllModule
 import bll.embeddingsBll as embeddingsBllModule
+import numpy as np
 
 class move_sugestao_treinamentoBLL:
     
@@ -201,20 +202,47 @@ class move_sugestao_treinamentoBLL:
             raise RuntimeError(f"Erro ao deletar id {idSimilar} sugestao_textos_classificar: {e}")
         
                         
+    def _regenerate_embedding_classificar(self, idBase:int,codClasse:int,classe:str) -> Optional[dict[str, Any]]:
+        try:
+            row = self.session.execute(text("""
+                SELECT TxtTreinamento
+                FROM textos_classificar
+                WHERE id = :idBase
+            """), {"idBase": idBase}).mappings().first()
+            if not row:
+                return None
+            
+            texto_treinamento = row["TxtTreinamento"]
+            embedding_vector = self.embeddingsBll.generate_embedding(texto_treinamento,Id=idBase)
+
+            if embedding_vector is None:
+                raise RuntimeError(f"Erro ao gerar embedding para o ID {idBase}.")
+            
+            return {                
+                "IdEncontrado": int(idBase),
+                "Classe": classe,
+                "CodClasse": codClasse,
+                "Embedding": np.array(embedding_vector, dtype=np.float32)                
+            }
+        
+        except Exception as e:
+            raise RuntimeError(f"Erro ao recriar embedding para o ID {idBase}: {e}")    
+        
     #Insere os IDs coletados para a coleção final do Qdrant.                    
     def _insert_ids_to_qdrant_final(self, lista_ids_mover: set, CodClasse:int, Classe: str, coduser:int) -> None:
         try:
             for id in lista_ids_mover:
                 registro = self.qdrant_utils.get_id(id=id, collection_name=self.train_collection)
                 if registro is None:
-                    raise RuntimeError(f"Aviso: ID {id} não encontrado na collection train, pulando")
-                    continue
+                    registro = self._regenerate_embedding_classificar(idBase=id, codClasse=CodClasse, classe=Classe)
+                    if registro is None:                        
+                        continue # aqui vai continuar pois ele pode ter sido movido previamente , logo não vou para a execução
                 
                 self._insert_id_in_qdrant_final(id, registro["Embedding"], CodClasse, Classe)
                 self._insert_id_in_textos_treinamento(id=id, CodClasse=CodClasse, coduser=coduser)  # Move para textos_treinamento
                            
         except Exception as e:
-            raise RuntimeError(f"Erro ao mover ids para Qdrant final: {e}") 
+            raise RuntimeError(f"Erro ao mover ids para o banco vetorial final: {e}") 
         
     def _check_reg_exists_in_sugestao_textos_classificar(self, idBase: int,idSimilar:int) -> bool:
         query = f"SELECT COUNT(*) FROM sugestao_textos_classificar WHERE IdBase = :IdBase AND IdSimilar = :IdSimilar"
@@ -434,10 +462,6 @@ class move_sugestao_treinamentoBLL:
         try:    
             if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)):
                 raise RuntimeError(f"Erro: Registro com IdBase {idBase} e IdSimilar {idSimilar} não encontrado em sugestao_textos_classificar")
-            
-            ##arrumar isso aqui pois tem que ver quando ele não encontrar chamar minha api para restaurar
-            #self._copia_texto_treinamento_para_textos_classificar(idBase)
-             #   if not (self._check_reg_exists_in_sugestao_textos_classificar(idBase, idSimilar)): #verifica novamente
 
             if (idBase != idSimilar):#faz isso para verificar se ja foi classificado o IdBase Principal
                 self._check_idBase_in_textos_treinamento(idBase)
