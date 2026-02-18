@@ -203,6 +203,7 @@ class indexa_textos_classificarBll:
                 for j, embedding in enumerate(embeddings):
                 # ✅ FILTRO OBRIGATÓRIO
                     if embedding is None:
+                        print_with_time(f"Aviso: Embedding nulo para id {ids[j]}, texto vazio.")
                         ids_invalidos.append(ids[j]) 
                         continue                    
 

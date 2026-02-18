@@ -59,6 +59,7 @@ if __name__ == "__main__":
     HTTP_PORT = int(localconfig.get("http_port"))
     workers = int(localconfig.get("workers"))
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
+    common.print_with_time(f"Banco vetorial de destino -> {localconfig.get('vectordatabasehost')}")
     
     uvicorn.run(
         "main:fastApi",          

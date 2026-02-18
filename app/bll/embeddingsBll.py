@@ -92,7 +92,7 @@ class EmbeddingsBll:
             else:
                 ids_list = ids
             if len(ids_list) != len(texts_list):
-                raise ValueError("O número de IDs deve corresponder ao número de texts.")
+                raise RuntimeError("O número de IDs deve corresponder ao número de texts.")
         else:
             ids_list = [None] * len(texts_list)
 
