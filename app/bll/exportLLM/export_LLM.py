@@ -20,7 +20,7 @@ import json
 
 
 #Gera um arquivo json para fazer DAPT (Domain-Adaptive Pretraining) no bgem3 model
-class DAPT_bge_m3:
+class Export_LLM:
     def __init__(self,  session: Session):     
         self.session = session
         self.localconfig = localconfig
@@ -35,31 +35,14 @@ class DAPT_bge_m3:
 
     #faz a consulta no banco de dados para obter os dados a serem processados
     def _fetch_data(self) -> list:   
-        qtdPalavrasMinima = 80
-        qtdPalavrasMaxima = 2100#faz até 2100 pois ele só salva até 2048 e deixa uma margem de segurança
+        qtdPalavrasMaxima = 512#faz até 2100 pois ele só salva até 2048 e deixa uma margem de segurança
 
         query = f"""
                 (
                     select tc.TxtTreinamento,tc.QtdPalavras,min(tc.id) as id
                     from textos_classificar tc
-                    where 
-                    (  
-                       tc.id in (select stc.idbase from sugestao_textos_classificar stc)
-                    )
-                    and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}                
-                )
-                UNION 
-                /*Aqui pede todos os textos que não estejam como similares que são diferentes*/
-                (
-                    select tc.TxtTreinamento,tc.QtdPalavras,min(tc.id) as id
-                    from textos_classificar tc
-                    where 
-                    (
-                       tc.id not in (select stc.idbase from sugestao_textos_classificar stc) or 
-                       tc.id not in (select stc2.idsimilar from sugestao_textos_classificar stc2)
-                    )
-                    and   tc.TxtTreinamento <> '' and tc.QtdPalavras  > {qtdPalavrasMinima} and tc.QtdPalavras  < {qtdPalavrasMaxima}
-                    group by tc.TxtTreinamento    
+                    where                     
+                    tc.TxtTreinamento <> '' and tc.QtdPalavras  <= {qtdPalavrasMaxima}                
                 )
                 Order by QtdPalavras asc
         """
@@ -93,57 +76,34 @@ class DAPT_bge_m3:
     #Inicia o processo de geração de embeddings
     def start(self):
         iniTime = time.time()  
-        print_with_time(f"Iniciando geração de arquivos JSON para DAPT de {self.model_path} : {iniTime}")
+        print_with_time(f"Iniciando geração de arquivos JSON para LLM de {self.model_path} : {iniTime}")
         dados = self._fetch_data()
         qtdreg = len(dados)
         if qtdreg == 0:
             return {"status": "Completo",
-                    "message": f"Não há dados para gerar DataSet DAPT. "}
+                    "message": f"Não há dados para gerar DataSet LLM. "}
     
         print_with_time(f"Total de registros a processar: {len(dados)}")
         tmpErros = ""
         processados = 0        
-        dapt_dataset = []
-        nivel_palavras = 1
+        dapt_dataset = []        
         result = ""
-        #gera os dadasets baseados na quantidade de caracteres para otimizar o treinamento
-        for i in tqdm(range(0, len(dados) ), desc=f"Exportando dados para DAPT"):
-            ### Aqui gerar o dataset DAPT
+        #gera os dadasets
+        for i in tqdm(range(0, len(dados) ), desc=f"Exportando dados para LLM"):
             row = dados[i]            
             try:
                 txtTreinamento = row['TxtTreinamento'].strip()
-                txtTreinamento = re.sub(r'\{[A-Za-z]{1,12}\}', '', txtTreinamento)  # Remove tags {TAG}
-                qtdPalavras    = row['QtdPalavras']                
+                txtTreinamento = re.sub(r'\{[A-Za-z]{1,15}\}', '', txtTreinamento)  # Remove tags {TAG}
+         
                 
                 dapt_dataset.append({"text": txtTreinamento,
                                      "id": row["id"]
                                      })
                 processados += 1
-                if (nivel_palavras == 1) and (qtdPalavras > 128):
-                    nivel_palavras = 2
-                    result += self._save_dapt_file(dapt_dataset,"0128")
-                elif (nivel_palavras == 2) and (qtdPalavras >= 256):
-                    nivel_palavras = 3
-                    result += self._save_dapt_file(dapt_dataset,"0256")                    
-                elif (nivel_palavras == 3) and (qtdPalavras >= 512):
-                    nivel_palavras = 4
-                    result += self._save_dapt_file(dapt_dataset,"0512")                    
-                elif (nivel_palavras == 4) and (qtdPalavras >= 768):
-                    nivel_palavras = 5
-                    result += self._save_dapt_file(dapt_dataset,"0768")                    
-                elif (nivel_palavras == 5) and (qtdPalavras >= 1024):
-                    nivel_palavras = 6
-                    result += self._save_dapt_file(dapt_dataset,"1024")                    
-                elif (nivel_palavras == 6) and (qtdPalavras >= 1512):
-                    nivel_palavras = 7
-                    result += self._save_dapt_file(dapt_dataset,"1512")                            
-                elif (nivel_palavras == 7) and (qtdPalavras >= 1768):
-                    nivel_palavras = 8
-                    result += self._save_dapt_file(dapt_dataset,"1768")                
-                elif (nivel_palavras == 8) and (qtdPalavras >= 2048):
-                    nivel_palavras = 9
-                    result += self._save_dapt_file(dapt_dataset,"2048")      
-
+             
+                print_with_time("Implementar código novo de exportação aqui, pegar todos os textos medir similaridade e só mandar textos diferentes entre as classes")
+                result += self._save_dapt_file(dapt_dataset,"0128")
+             
 
             except Exception as e:
                 tmpErros += f"Erro ao processar registro {i+1}: {e}\n"

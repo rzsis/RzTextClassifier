@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException,Depends
+from fastapi import Body, FastAPI, HTTPException,Depends
 from pydantic import BaseModel
 import time
 from typing import Optional
@@ -127,10 +127,21 @@ async def busca_textos( id:int,#passar 0 se não quiser filtrar por id
         return busca_textoBLL.busca_texto(id=id,
                                           codclasse=codclasse,
                                           texto=texto,
-                                          data_inicial=data_inicial,
-                                          data_final=data_final,
                                           similaridade_minima=similaridade_minima,
                                           collection_name=collection_name)
         
     except Exception as e:
         return HTTPException(status_code=500, detail=f"Erro em busca_textos : {str(e)}")    
+    
+#endpoint para buscar textos treinamento
+@router.post("/classifica_ids")
+async def classifica_ids(lista_ids:list[int] = Body(..., embed=True),#passar 0 se não quiser filtrar por id
+                        session: Session = Depends(get_session_db)):        
+
+    try:             
+        classifica_textoBll = classifica_textoBllModule.classifica_textoBll(embeddingsBllModule.get_bllEmbeddings(session=session),session=session)        
+        resultados = classifica_textoBll.classifica_ids(lista_ids=lista_ids, gravar_log=True)        
+        return resultados
+        
+    except Exception as e:
+        return HTTPException(status_code=500, detail=f"Erro em classifica_ids : {str(e)}")

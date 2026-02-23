@@ -10,14 +10,15 @@ from operator import index
 from fastapi import FastAPI
 import controllers.text_controller as text_controller
 import controllers.index_controller as index_controller
-import controllers.embeddings_generate_controller as embeddings_generate_controller
 import controllers.edit_text_contoller as edit_text_contoller
 import localconfig
 import common
 import logger
 import bll.embeddingsBll as bllEmbeddings
 from gpu_utils import GpuUtils  as gpu_utilsModule
-import bll.onxx_utils.export_bge_m3_to_onnx as bllExportBgeM3ToOnnx    
+import bll.onxx_utils.export_bge_m3_to_onnx as bllExportBgeM3ToOnnx   
+import dbClasses.classes_utils
+
 
 #os.system("clear")
 
@@ -38,7 +39,6 @@ logger.setup_global_exception_logging(fastApi)  # adiciona os exception handlers
 # 4) Registra os controllers (APIRouter)
 fastApi.include_router(text_controller.router)
 fastApi.include_router(index_controller.router)
-fastApi.include_router(embeddings_generate_controller.router)
 fastApi.include_router(edit_text_contoller.router)
 fastApi.include_router(finetuning_contoller.router)
 
@@ -53,6 +53,7 @@ if __name__ == "__main__":
     # Garantir que ao exportar para ONNX o modelo seja o bge original e não o convertido ONNX
     # Gerar um readme com explicacoes do modelo exportado
 
+
     #bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
     import uvicorn
@@ -60,6 +61,7 @@ if __name__ == "__main__":
     workers = int(localconfig.get("workers"))
     common.print_with_time(f"Iniciando {appName} na porta {HTTP_PORT}")    
     common.print_with_time(f"Banco vetorial de destino -> {localconfig.get('vectordatabasehost')}")
+    dbClasses.classes_utils.initClassesUtils(common._db.get_session())  # Inicializa o singleton de classes_utilsBLL com a sessão do banco de dados
     
     uvicorn.run(
         "main:fastApi",          

@@ -28,8 +28,6 @@ class busca_textoBLL:
                     id:int,
                     codclasse:int,
                     texto:str,
-                    data_inicial:str,
-                    data_final:str,
                     similaridade_minima:float,
                     collection_name:str
                     ) -> list[dict]:        
@@ -49,9 +47,7 @@ class busca_textoBLL:
                                                          itens_limit = 100,
                                                          similarity_threshold = similaridade_minima,
                                                          id = id,
-                                                         codclasse = codclasse,
-                                                         data_inicial = data_inicial,
-                                                         data_final = data_final)
+                                                         codclasse = codclasse)
                             
         except Exception as e:
             raise RuntimeError(f"Erro em busca_texto: {e}")

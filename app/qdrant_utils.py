@@ -1,5 +1,4 @@
 # qdrant_utils.py
-from ast import Dict
 from datetime import date
 import datetime
 from typing import Any, List, Optional
@@ -14,6 +13,7 @@ import requests
 from importlib.metadata import version as pkg_version
 from qdrant_client.http.exceptions import UnexpectedResponse
 import time
+from dbClasses.classes_utils import classes_utils_singleton
 
 class Qdrant_Utils:
     def __init__(self):
@@ -24,6 +24,10 @@ class Qdrant_Utils:
         self.collectionSize = localcfg.get("max_length")  # Dimensão dos embeddings
         self._connect_qDrant()        
         self.vector_name = "default"
+
+    def get_classe(self,codClasse: int) -> Optional[str]:
+        return classes_utils_singleton.get_nome_classe(codClasse)
+    
 
     def _connect_qDrant(self) -> bool:
         try:
@@ -185,15 +189,18 @@ class Qdrant_Utils:
             )
 
 
-            high_similars = [
-                {
-                    "IdEncontrado": int(res.id),  
-                    "Similaridade": res.score, # type: ignore
-                    "Classe": (res.payload or {}).get("Classe"),                
-                    "CodClasse": (res.payload or {}).get("CodClasse")                 
-                }
-                for res in search_results                
-            ]
+    
+            for res in search_results:
+                codClasse = (res.payload or {}).get("CodClasse")
+                Classe = self.get_classe(codClasse) if codClasse is not None else None
+                high_similars.append(
+                    {
+                        "IdEncontrado": int(res.id),  
+                        "Similaridade": res.score, # type: ignore
+                        "Classe": Classe,              
+                        "CodClasse": codClasse                 
+                    }
+                )                          
             
 
             return high_similars
@@ -208,9 +215,7 @@ class Qdrant_Utils:
                                   itens_limit: int,
                                   similarity_threshold: float,
                                   id: int,
-                                  codclasse: int,
-                                  data_inicial: str,
-                                  data_final: str) -> list[dict]:
+                                  codclasse: int) -> list[dict]:
         try:
             high_similars = []
             embedding = np.array(embedding, dtype=float)
@@ -237,37 +242,6 @@ class Qdrant_Utils:
                     )
                 )                   
 
-            # 4. Filtro por range de DataEvento (formato DD-MM-YYYY)
-            if data_inicial or data_final:
-                raise RuntimeError("A data inicial e final devem ser fornecidas juntas para o filtro de data.")
-            
-
-            if data_inicial and data_final:
-                range_filter = datetime.Range()
-                if data_inicial:
-                    # Converte string DD-MM-YYYY para datetime para garantir ordenação correta
-                    try:
-                        dt_inicio = datetime.strptime(data_inicial, "%d-%m-%Y")
-                        range_filter.gte = dt_inicio.timestamp()   # Qdrant aceita timestamp float
-                    except ValueError:
-                        print_with_time(f"Formato inválido para data_inicial: {data_inicial}")
-                        return []
-                
-                if data_final:
-                    try:
-                        dt_fim = datetime.strptime(data_final, "%d-%m-%Y")
-                        range_filter.lte = dt_fim.timestamp()
-                    except ValueError:
-                        print_with_time(f"Formato inválido para data_final: {data_final}")
-                        return []
-
-                filter_clauses.append(
-                    FieldCondition(
-                        key="DataEvento",   # precisa estar armazenado como timestamp float no payload
-                        range=range_filter
-                    )
-                )
-
             # Monta o filtro final (AND entre todas as condições)
             if filter_clauses:
                 query_filter = Filter(must=filter_clauses)  
@@ -283,15 +257,17 @@ class Qdrant_Utils:
                 query_filter=query_filter
             )
 
-            high_similars = [
-                {
-                    "IdEncontrado": int(res.id),
-                    "Similaridade": res.score,
-                    "Classe": (res.payload or {}).get("Classe"),
-                    "CodClasse": (res.payload or {}).get("CodClasse")                    
-                }
-                for res in search_results
-            ]
+            for res in search_results:
+                codClasse = (res.payload or {}).get("CodClasse")
+                classe = self.get_classe(codClasse) if codClasse is not None else None
+                high_similars.append(
+                    {
+                        "IdEncontrado": int(res.id),
+                        "Similaridade": res.score,
+                        "Classe": classe,
+                        "CodClasse": codClasse  
+                    }
+                )
 
             return high_similars
 
@@ -306,7 +282,7 @@ class Qdrant_Utils:
                 collection_name=collection_name,
                 ids=[id],
                 with_vectors=True,
-                with_payload=["Classe", "CodClasse"]
+                with_payload=["CodClasse"]
             )
             if not records:
                 print_with_time(f"Aviso: Id {id} não encontrado no banco vetorial, pulando")
@@ -332,10 +308,12 @@ class Qdrant_Utils:
                 return None
 
             payload = rec.payload or {}
+            codClasse = payload.get("CodClasse")
+            Classe = classes_utils_singleton.get_nome_classe(codClasse) if codClasse is not None else None  
             return {
-                "IdEncontrado": int(rec.id),
-                "Classe": payload.get("Classe"),
-                "CodClasse": payload.get("CodClasse"),
+                "IdEncontrado": int(rec.id),                
+                "CodClasse": codClasse,
+                "Classe": Classe,                
                 "Embedding": np.array(embedding, dtype=np.float32)
             }
         except Exception as e:
@@ -354,16 +332,13 @@ class Qdrant_Utils:
             print_with_time(f"Erro ao apagar Id {id}: {e}")
 
     #Insere ou atualiza um ID no qdrant
-    def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, codclasse:int, classe:str ) -> bool:
+    def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, cod_classe:int ) -> bool:
         try:
             #só deve obrigar codclasse e classe na coleção final
             final_collection = self.get_collection_name("final")
 
-            if (collection_name == final_collection)  and ((codclasse is None) or (codclasse == 0)):
-                raise RuntimeError(f"CodClasse não pode ser None ou 0 para o ID {id} na coleção {collection_name}")
-            
-            if (collection_name == final_collection)  and ((classe is None) or (classe.strip() == "")): 
-                raise RuntimeError(f"Classe não pode ser None para o ID {id} na coleção {collection_name}")
+            if (collection_name == final_collection)  and ((cod_classe is None) or (cod_classe == 0)):
+                raise RuntimeError(f"CodClasse não pode ser None ou 0 para o ID {id} na coleção {collection_name}")        
             
             #embeddings não pode ser None ou vazio
             if (embeddings is None) or (len(embeddings) == 0):
@@ -372,13 +347,16 @@ class Qdrant_Utils:
             if len(embeddings) != self.collectionSize:
                 raise RuntimeError(f"Embeddings para o ID {id} na coleção {collection_name} tem tamanho {len(embeddings)}, esperado {self.collectionSize}")
 
-            #monta o payload
-            dataevento = date.today()
+            if not isinstance(id, int):
+                raise RuntimeError("Id deve ser int.")
+
+            if not isinstance(cod_classe, int):
+                raise RuntimeError("CodClasse deve ser int.")
+
+            #monta o payload            
             payload={        
-                    "Id": id,
-                    "Classe": classe,
-                    "CodClasse": codclasse,
-                    "DataEvento": dataevento.strftime("%d-%m-%Y")                        
+                    "Id": id,                    
+                    "CodClasse": cod_classe,                    
                     }
 
             self._qdrant_client.upsert(

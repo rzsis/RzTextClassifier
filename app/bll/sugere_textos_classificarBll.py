@@ -320,7 +320,7 @@ class sugere_textos_classificarBll:
                 
 
     #faz a busca de similares e retorna a lista para inserir na sugestão de classificação
-    #min_similarity = Caso eu quer uma similaridade mínima diferente da calculada, posso passar no parâmetro min_similarity        
+    #min_similarity = Caso eu querer uma similaridade mínima diferente da calculada, posso passar no parâmetro min_similarity        
     def get_similares(self,data: dict,  min_similarity:float = None,itens_limit:int = 300) -> list: # type: ignore
         try:
             id              = data['id']  
@@ -340,7 +340,7 @@ class sugere_textos_classificarBll:
                                                                            itens_limit=itens_limit,
                                                                            gravar_log=False,
                                                                            min_similarity = min_similarity,
-                                                                           exclusion_list = [])
+                                                                           )
 
             if (result == None) or (result.ListaSimilaridade == None):
                 return None # type: ignore
@@ -624,4 +624,4 @@ class sugere_textos_classificarBll:
                 "processados": errorMessage,
                 "restante": ""
             }
-    
+        

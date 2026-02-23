@@ -63,8 +63,7 @@ class move_sugestao_treinamentoBLL:
                 collection_name=self.train_collection,
                 id=idBase,
                 embeddings=embedding_vector,
-                codclasse=None,
-                classe=None
+                cod_classe=None                
             )
             print_with_time(f"Embedding recriado e inserido na collection final para o ID {idBase} na coleção de treinamento.")
 
@@ -189,8 +188,8 @@ class move_sugestao_treinamentoBLL:
         self.qdrant_utils.upinsert_id(collection_name=self.final_collection,
                                     id=id, 
                                     embeddings=embeddings,
-                                    codclasse=CodClasse,
-                                    classe=classe)
+                                    cod_classe=CodClasse
+            )
             
 
     #Remove todos os registros relacionados ao idBase da tabela sugestao_textos_classificar.

@@ -32,8 +32,7 @@ class edit_textos_treinamentoBLL:
             if not self.qdrant_utils.upinsert_id(collection_name=self.final_collection,
                                           id=id,
                                           embeddings=idFound["Embedding"],
-                                          codclasse=codClasse,
-                                          classe=idFound["Classe"]):
+                                          cod_classe=codClasse):
                 raise RuntimeError(f"Erro ao atualizar o ID {id} na coleção final.")
                         
             sql = text("""
