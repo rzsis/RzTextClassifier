@@ -11,6 +11,7 @@ from fastapi import FastAPI
 import controllers.text_controller as text_controller
 import controllers.index_controller as index_controller
 import controllers.edit_text_contoller as edit_text_contoller
+import controllers.utils_controller as utils_controller
 import localconfig
 import common
 import logger
@@ -41,7 +42,7 @@ fastApi.include_router(text_controller.router)
 fastApi.include_router(index_controller.router)
 fastApi.include_router(edit_text_contoller.router)
 fastApi.include_router(finetuning_contoller.router)
-
+fastApi.include_router(utils_controller.router)
 common._db.test_connection()
 
 gpu_utilsModule().print_gpu_info()
