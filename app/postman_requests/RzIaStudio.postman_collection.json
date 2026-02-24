@@ -600,6 +600,66 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "classifica_ids",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"lista_ids\": [100000000, 100000001,0]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.1.1.96:5020/classifica_ids",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"96"
+					],
+					"port": "5020",
+					"path": [
+						"classifica_ids"
+					],
+					"query": [
+						{
+							"key": "lista_ids",
+							"value": "[0,1]",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "update_classes",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://10.1.1.96:5020/update_classes",
+					"protocol": "http",
+					"host": [
+						"10",
+						"1",
+						"1",
+						"96"
+					],
+					"port": "5020",
+					"path": [
+						"update_classes"
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }
