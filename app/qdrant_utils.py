@@ -13,7 +13,7 @@ import requests
 from importlib.metadata import version as pkg_version
 from qdrant_client.http.exceptions import UnexpectedResponse
 import time
-from dbClasses.classes_utils import classes_utils_singleton
+import dbClasses.classes_utils as classes_utils
 
 class Qdrant_Utils:
     def __init__(self):
@@ -26,7 +26,7 @@ class Qdrant_Utils:
         self.vector_name = "default"
 
     def get_classe(self,codClasse: int) -> Optional[str]:
-        return classes_utils_singleton.get_nome_classe(codClasse)
+        return classes_utils.classes_utils_singleton.get_nome_classe(codClasse)
     
 
     def _connect_qDrant(self) -> bool:
@@ -191,7 +191,7 @@ class Qdrant_Utils:
 
     
             for res in search_results:
-                codClasse = (res.payload or {}).get("CodClasse")
+                codClasse = (res.payload or {}).get("CodClasse") or None
                 Classe = self.get_classe(codClasse) if codClasse is not None else None
                 high_similars.append(
                     {
@@ -258,7 +258,7 @@ class Qdrant_Utils:
             )
 
             for res in search_results:
-                codClasse = (res.payload or {}).get("CodClasse")
+                codClasse = (res.payload or {}).get("CodClasse") or None
                 classe = self.get_classe(codClasse) if codClasse is not None else None
                 high_similars.append(
                     {

@@ -193,8 +193,8 @@ class classifica_textoBll:
             else:
                 result_similaridade = None  
 
-            if (item_pai != None) and (item_pai["IdEncontrado"] != None):
-                item_pai["Classe"] = dbClasses_utils_get_ClassesUtils().get_nome_classe(item_pai["CodClasse"])
+            if (item_pai != None) and (item_pai["IdEncontrado"] != None) and (item_pai["CodClasse"] != None):
+                item_pai["Classe"] = dbClasses_utils_get_ClassesUtils().get_nome_classe(item_pai["CodClasse"]) or None
 
 
 

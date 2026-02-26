@@ -77,7 +77,7 @@ class indexa_textos_treinamentoBll:
     def _fetch_data_not_indexed(self) -> Sequence[RowMapping]:
         try:
             query = f"""
-                SELECT t.id, t.TxtTreinamento AS Text
+                SELECT t.id, t.TxtTreinamento AS Text,t.CodClasse
                 FROM textos_treinamento t
                 {self.baseWhereSQLNotIndexed}
                 ORDER BY t.id
@@ -112,8 +112,7 @@ class indexa_textos_treinamentoBll:
             points = []
             for item in processed_data:
                 payload={        
-                    "Id":  item['Id'],
-                    "Classe": item.get('Classe') or None,
+                    "Id":  item['Id'],                    
                     "CodClasse": item.get('CodClasse') or None
                 }                
                 
@@ -170,6 +169,7 @@ class indexa_textos_treinamentoBll:
             batch = data[i:i + batch_size]
             texts = [row['Text'] for row in batch]
             ids = [row['id'] for row in batch]
+            codClasses = [row['CodClasse'] for row in batch]
             
             try:                
                 embeddings = embeddingsBllModule.bllEmbeddings.generate_embeddings(texts, ids)
@@ -178,7 +178,8 @@ class indexa_textos_treinamentoBll:
                     processed_data.append({
                         'Id': ids[j],
                         'Embedding': embedding,
-                        'UpInsertOk': False  # Inicialmente False, será atualizado após upsert
+                        'UpInsertOk': False,  # Inicialmente False, será atualizado após upsert
+                        'CodClasse': codClasses[j]  # Adiciona CodClasse ao dicionário
                     })
                 
               

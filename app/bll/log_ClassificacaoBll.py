@@ -11,7 +11,7 @@ class LogClassificacaoBll:
         self.session = session
         self.logger = logger.log
 
-    def gravaLogClassificacao(self, id_referencia: int, id_classificado: int, metodo: str, tabela_origem: str, cod_classe_inferido: Optional[int]):
+    def gravaLogClassificacao(self, id_referencia: int, id_classificado:  int, metodo: str, tabela_origem: str, cod_classe_inferido: Optional[int]):
         """
         Inserts a classification log entry into the log_classificacao table.
 

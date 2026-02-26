@@ -351,11 +351,12 @@ class sugere_textos_classificarBll:
             if (itens_limit > 0) and (qtd_similares >= itens_limit):                
                 result = self.classifica_textoBll.get_similarity_list(query_embedding= id_found["Embedding"],
                                                                         collection_name=self.textos_classificar_collection_name,
-                                                                        id_a_classificar= None,
+                                                                        id_a_classificar = None,
                                                                         TabelaOrigem="C",
                                                                         itens_limit=itens_limit+10000,
                                                                         gravar_log=False,
-                                                                        min_similarity = min_similarity)
+                                                                        min_similarity = min_similarity
+                                                                        )
                                                 
                                     
             lista_similares = [item.__dict__ for item in result.ListaSimilaridade if item.IdEncontrado not in self.lista_sugestao_textos_classificar] # type: ignore
