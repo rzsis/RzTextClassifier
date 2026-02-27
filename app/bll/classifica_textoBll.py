@@ -1,4 +1,5 @@
 #classifica_textoBll.py
+from ast import Dict
 import re
 import string
 from typing_extensions import runtime
@@ -248,6 +249,21 @@ class classifica_textoBll:
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar textos por IDs: {e}")
 
+    def get_ids_inexistentes(self, lista_textos: List[int], lista_ids: dict) -> List['classifica_textoBll.ResultadoSimilaridade']:        
+        ids_inexistentes =  set(lista_ids) - set(lista_textos.keys())
+        return [self.ResultadoSimilaridade(
+                    IdEncontrado=None,
+                    CodClasse=None,
+                    Classe=f"ID não encontrado na base de textos a classificar",
+                    Similaridade=None,
+                    Metodo="N",
+                    CodClasseMedia=None,
+                    CodClasseQtd=None,
+                    ListaSimilaridade=None,
+                    ListaClassesInfo=None,
+                    IdPesquisado=id_inexistente
+                ) for id_inexistente in ids_inexistentes]   
+    
 
     # classifica uma lista de ids e retorna a similaridade de cada um com os textos de referência, o resultado é uma lista de ResultadoSimilaridade para cada id classificado
     def classifica_ids(self, 
@@ -259,25 +275,40 @@ class classifica_textoBll:
             raise ValueError(f"Métodos de seleção {metodo_selecao} inválidos. Aceitos: 'E', 'M', 'Q'.")   
 
 
-        lista_textos = self._get_textos_classificar_by_ids(lista_ids)
-        
+        lista_textos = self._get_textos_classificar_by_ids(lista_ids)        
         resultados = []
+        resultados.extend(self.get_ids_inexistentes(lista_textos, lista_ids)) # Adiciona resultados para IDs inexistentes para achar os não existente  
+        similaridade_minima = 0.98
+        
         for id, texto in lista_textos.items():
             try:
                 query_embedding = self.embeddingsModule.generate_embedding(texto,id)
 
                 resultado_similaridade = self.get_similarity_list(query_embedding=query_embedding,                                            
                                             collection_name=self.final_collection_name,                                                                                        
-                                            itens_limit=30,
+                                            itens_limit=1,
                                             gravar_log=gravar_log,
                                             return_ListaSimilares=False,
+                                            min_similarity=similaridade_minima, # para busca por ids é interessante ser mais rigoroso para garantir que o resultado seja realmente similar ao texto classificado, afinal estamos buscando o mesmo texto ou um texto muito similar
                                             )                  
-                if (resultado_similaridade.IdEncontrado != None):   
-                    resultado_similaridade.IdPesquisado = id
+                if (resultado_similaridade.IdEncontrado != None) and (resultado_similaridade.CodClasse != None):                    
                     resultados.append(resultado_similaridade)
+                else:
+                    resultados.append(self.ResultadoSimilaridade(
+                        IdEncontrado=None,
+                        CodClasse=None,
+                        Classe=f"Não encontrada similaridade superior {similaridade_minima*100}%",
+                        Similaridade=None,
+                        Metodo="N",
+                        CodClasseMedia=None,
+                        CodClasseQtd=None,
+                        ListaSimilaridade=None,
+                        ListaClassesInfo=None,
+                        IdPesquisado=id
+                    ))
+                
 
             except Exception as e:
-                raise RuntimeError(f"Erro ao classificar ID {id}: {e}")
-
+                raise RuntimeError(f"Erro ao classificar ID {id}: {e}")           
         
         return resultados
