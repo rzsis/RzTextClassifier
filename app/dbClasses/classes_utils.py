@@ -34,8 +34,7 @@ class classes_utilsBLL:
                 SELECT
                     c.CodClasse,
                     c.CodSubClasse,
-                    c.Classe,
-                    c.CodClasseTreinamento
+                    c.Classe                    
                 FROM classes c
                 ORDER BY c.CodClasse
             """
@@ -55,5 +54,8 @@ class classes_utilsBLL:
         def get_lista_classes(self) -> list[dict]:
             return list(self._classes)
 
-        def get_nome_classe(self, codclasse: int) -> str | None:
-            return self._classes_by_cod.get(int(codclasse))
+        def get_nome_classe(self,  codclasse: Optional[int]) -> str | None:
+            classe =  self._classes_by_cod.get(int(codclasse)) if codclasse is not None else None
+            if classe is None:
+                classe = f"Classe com CodClasse {codclasse} não encontrada no banco de dados."
+            return classe

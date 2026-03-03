@@ -1,4 +1,5 @@
 # qdrant_utils.py
+from ast import Raise
 from datetime import date
 import datetime
 from typing import Any, List, Optional
@@ -25,7 +26,7 @@ class Qdrant_Utils:
         self._connect_qDrant()        
         self.vector_name = "default"
 
-    def get_classe(self,codClasse: int) -> Optional[str]:
+    def get_classe(self,codClasse: Optional[int]) -> Optional[str]:
         return classes_utils.classes_utils_singleton.get_nome_classe(codClasse)
     
 
@@ -206,8 +207,8 @@ class Qdrant_Utils:
             return high_similars
         
         except Exception as e:
-            print_with_time(f"Erro ao buscar similares no banco vetorial {e}")
-            return []
+            print_with_time(f"Erro em search_embedding no banco vetorial {e}")
+            raise RuntimeError(f"Erro em search_embedding no banco vetorial: {e}")
         
     def search_embedding_and_metaData(self,
                                   embedding: np.ndarray,
@@ -272,8 +273,9 @@ class Qdrant_Utils:
             return high_similars
 
         except Exception as e:
-            print_with_time(f"Erro ao buscar similares no banco vetorial: {e}")
-            return []
+            erro = f"Erro em search_embedding_and_metaData no banco vetorial: {e}"
+            print_with_time(erro)
+            raise RuntimeError(erro)
 
 
     def get_id(self, id: int, collection_name: str) -> Optional[dict[str, Any]]:
@@ -309,7 +311,7 @@ class Qdrant_Utils:
 
             payload = rec.payload or {}
             codClasse = payload.get("CodClasse")
-            Classe = classes_utils_singleton.get_nome_classe(codClasse) if codClasse is not None else None  
+            Classe = classes_utils.classes_utils_singleton.get_nome_classe(codClasse) if codClasse is not None else None  
             return {
                 "IdEncontrado": int(rec.id),                
                 "CodClasse": codClasse,

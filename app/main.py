@@ -3,6 +3,7 @@ import os
 #Necessario colocar ja inicio para pegar antes de importar torch
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # Makes errors immediate
 os.environ['TORCH_USE_CUDA_DSA'] = '1'  # Enables device-side assertions
+from dbClasses import classes_utils
 import localconfig
 import common
 import logger
@@ -40,6 +41,7 @@ if __name__ == "__main__":
 
     #bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
+    classes_utils.initClassesUtils(common._db.get_session())
     common.print_with_time(f"Banco vetorial de destino -> {localconfig.get('vectordatabasehost')}")
 
     uvicorn.run(
