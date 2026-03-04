@@ -17,13 +17,11 @@ __pycache__/
 *.pyd
 
 RzTextClassifier.config
-<<<<<<< HEAD
-=======
 ../RzTextClassifier.config
->>>>>>> 88552a8 (Removido RzTextClassifier.config do git)
 146_rz_RzTextClassifier.config
 .gitignore
 2352_oliveira_RzTextClassifier.config
 2352-oliveira_RzTextClassifier.config
 RzTextClassifier_Beta.config
 RzTextClassifier_oliveira.config
+RzTextClassifier_Oliveira.config
