@@ -1,5 +1,4 @@
 # embeddingsBll.py
-import time
 import numpy as np
 from db_utils import Session
 from typing import  Dict, List, Optional,Union
@@ -7,7 +6,6 @@ from common import print_with_time
 import logger
 from transformers import AutoTokenizer,AutoModel
 import torch
-import torch.nn as nn
 import bll.onxx_utils.dense_embedding_wrapper as dense_embedding_wrapperModule
 import onnxruntime as ort
 import os
@@ -65,14 +63,17 @@ class EmbeddingsBll:
         return emb
 
 
+    def _clean_text(self, text: str) -> Optional[str]:
+        if not text or not isinstance(text, str):
+            return None
+        clean = ''.join(ch for ch in text if ord(ch) >= 32 and ord(ch) != 127).strip()
+        return clean if clean else None
+
     def generate_embeddings(
         self,
         texts: Union[str, List[str]],
         ids: Optional[Union[int, List[Optional[int]]]] = None
     ) -> Union[Optional[np.ndarray], List[Optional[np.ndarray]]]:
-        if self.torch_model is None:
-            raise RuntimeError("generate_embeddings requer GPU. Use generate_embedding (ONNX) em ambiente CPU.")
-
         # ---- modo single/batch ----
         if isinstance(texts, str):
             texts_list = [texts]
@@ -81,20 +82,38 @@ class EmbeddingsBll:
             texts_list = texts
             single_mode = False
 
-        # ✅ checagem aqui (ANTES de tokenizar)
-        if self.tokenizer is None:
-            raise RuntimeError("tokenizer não carregado. Chame load_model_and_tokenizer() antes.")            
-
-        # ---- normaliza ids (só para logs/erros) ----
+        # ---- normaliza ids ----
         if ids is not None:
             if isinstance(ids, int):
                 ids_list: List[Optional[int]] = [ids]
             else:
-                ids_list = ids
+                ids_list = list(ids)
             if len(ids_list) != len(texts_list):
                 raise RuntimeError("O número de IDs deve corresponder ao número de texts.")
         else:
             ids_list = [None] * len(texts_list)
+
+        # ---- fallback se torch não estiver carregado ----
+        if self.torch_model is None:
+            print_with_time(
+                "[WARNING] torch_model não carregado. Gerando embeddings individualmente usando ONNX, "
+                "o que é mais lento. Chame load_model_and_tokenizer() para carregar o modelo PyTorch."
+            )
+
+            results: List[Optional[np.ndarray]] = [None] * len(texts_list)
+
+            for i, text in enumerate(texts_list):
+                try:
+                    results[i] = self.generate_embedding(text, ids_list[i], pClean_text=False)
+                except Exception:
+                    results[i] = None
+
+            return results[0] if single_mode else results            
+
+        # ✅ checagem aqui (ANTES de tokenizar)   
+        if self.tokenizer is None: 
+            raise RuntimeError("tokenizer não carregado. Chame load_model_and_tokenizer() antes.")            
+
 
         # ---- limpeza (SEM truncar por caracteres) ----
         clean_texts: List[Optional[str]] = [None] * len(texts_list)
@@ -102,10 +121,7 @@ class EmbeddingsBll:
 
         for idx, text in enumerate(texts_list):
             try:
-                if not text or not isinstance(text, str):
-                    continue
-
-                clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127).strip()
+                clean_text = self._clean_text(text)
 
                 if not clean_text:
                     continue
@@ -154,7 +170,7 @@ class EmbeddingsBll:
 
 
     #Gera embedding para um texto usando o ONNX (individual)
-    def generate_embedding(self, text: str, Id: Optional[int]) -> Optional[np.ndarray]: 
+    def generate_embedding(self, text: str, Id: Optional[int], pClean_text: bool = True) -> Optional[np.ndarray]: 
         try:
             #inicio = time.time()
             if not text or not isinstance(text, str):
@@ -163,10 +179,13 @@ class EmbeddingsBll:
             if self.tokenizer is None:
                 raise RuntimeError("Tokenizer não carregado. Chame load_model_and_tokenizer().")
             
+            if pClean_text:
+                clean_text = self._clean_text(text)
+            else:
+                clean_text = text
 
-            clean_text = ''.join(c for c in text if ord(c) >= 32 and ord(c) != 127).strip()
             if not clean_text:
-                return None
+                    return None                
 
             if self.onnx_session is None:
                 raise RuntimeError("onnx_session não carregada.")
@@ -185,7 +204,7 @@ class EmbeddingsBll:
             }
 
             embedding = self.onnx_session.run(None, ort_inputs)[0]
-            fim = time.time()
+            
 
             #tempo_decorrido_min = (time.time() - inicio) / 60          
             #print_with_time(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
@@ -208,6 +227,7 @@ class EmbeddingsBll:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_path,
                 local_files_only=True,
+                use_fast=True
             )
             
             if self.device.type == "cuda":

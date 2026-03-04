@@ -192,7 +192,7 @@ class indexa_textos_treinamentoBll:
                 processed_data = []  # Reseta a lista após o processamento do batch
 
             except Exception as e:
-                print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
+                raise RuntimeError(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
         
         self.gpu_utils.clear_gpu_cache()
 
