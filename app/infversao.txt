@@ -1,3 +1,6 @@
+1.0.0.1 05/03/2026
+Corrigido travamento da tabela classes que dava lock na tabela devido ao select
+
 1.0.0.0 05/03/2026
 Api funcionando e melhorado busca de similaridade
 Acresentado opção do versionamento relatando mudanças

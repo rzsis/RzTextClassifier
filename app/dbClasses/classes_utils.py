@@ -1,4 +1,6 @@
     
+import re
+
 from db_utils import Session
 from threading import Lock
 from typing import Optional
@@ -10,9 +12,7 @@ classes_utils_singleton = None
 def initClassesUtils(session: Session):
     global classes_utils_singleton
     if classes_utils_singleton is None:
-        with Lock():
-            if classes_utils_singleton is None:
-                classes_utils_singleton = classes_utilsBLL(session=session)
+        classes_utils_singleton = classes_utilsBLL(session=session)
 
 
 def get_ClassesUtils() -> 'classes_utilsBLL':
@@ -38,7 +38,9 @@ class classes_utilsBLL:
                 FROM classes c
                 ORDER BY c.CodClasse
             """
-            return [dict(row) for row in self.session.execute(text(query)).mappings().all()]
+            result = [dict(row) for row in self.session.execute(text(query)).mappings().all()]
+            self.session.close()
+            return result
 
         def atualizar_lista_classes(self) -> None:
             try:
