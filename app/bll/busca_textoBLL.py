@@ -32,7 +32,9 @@ class busca_textoBLL:
                     collection_name:str
                     ) -> list[dict]:        
         try:
-           if (len(texto.strip()) < 3):
+           if (id > 0) and (len(texto.strip()) > 0):
+               raise RuntimeError("Quando é informado um id para busca, o campo de texto deve ser vazio.")        
+           elif (len(texto.strip()) < 3) and (id == 0):
                raise RuntimeError("O texto para busca deve ter mais de 3 caracteres.")
 
            collection_name = self.qdrant_utils.get_collection_name(collection_name)

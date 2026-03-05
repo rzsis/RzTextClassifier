@@ -250,13 +250,20 @@ class Qdrant_Utils:
                 query_filter = None
 
             # ------------------- Busca no Qdrant -------------------
-            search_results = self._qdrant_client.search(
-                collection_name=collection_name,
-                query_vector=embedding.flatten().tolist(),
-                limit=itens_limit,
-                score_threshold=similarity_threshold,
-                query_filter=query_filter
-            )
+            if (embedding is None or ((embedding.size == 0) or (embedding.size == 1))) and (id > 0):
+                search_results, _ = self._qdrant_client.scroll(
+                    collection_name=collection_name,
+                    limit=itens_limit,
+                    scroll_filter=query_filter
+                )
+            else:
+                search_results = self._qdrant_client.search(
+                        collection_name=collection_name,
+                        query_vector=embedding.flatten().tolist(),
+                        limit=itens_limit,
+                        score_threshold=similarity_threshold,
+                        query_filter=query_filter
+                    )
 
             for res in search_results:
                 codClasse = (res.payload or {}).get("CodClasse") or None
@@ -264,7 +271,7 @@ class Qdrant_Utils:
                 high_similars.append(
                     {
                         "IdEncontrado": int(res.id),
-                        "Similaridade": res.score,
+                        "Similaridade": getattr(res, "score", 1),  # score default
                         "Classe": classe,
                         "CodClasse": codClasse  
                     }
