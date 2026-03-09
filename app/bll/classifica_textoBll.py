@@ -208,7 +208,8 @@ class classifica_textoBll:
                 CodClasseMedia=classe_maior_media,
                 CodClasseQtd=classe_maior_qtd,
                 ListaSimilaridade=result_similaridade,
-                ListaClassesInfo=lista_classes_info
+                ListaClassesInfo=lista_classes_info,
+                IdPesquisado=id_a_classificar,
             )
         except Exception as e:
             raise RuntimeError(f"Erro ao buscar similaridades: {e}")
@@ -284,8 +285,9 @@ class classifica_textoBll:
             try:
                 query_embedding = self.embeddingsModule.generate_embedding(texto,id)
 
-                resultado_similaridade = self.get_similarity_list(query_embedding=query_embedding,                                            
-                                            collection_name=self.final_collection_name,                                                                                        
+                resultado_similaridade = self.get_similarity_list(query_embedding=query_embedding,                                                                                        
+                                            collection_name=self.final_collection_name,
+                                            id_a_classificar=id ,                                            
                                             itens_limit=1,
                                             gravar_log=gravar_log,
                                             return_ListaSimilares=False,

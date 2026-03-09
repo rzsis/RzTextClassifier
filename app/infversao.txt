@@ -1,3 +1,6 @@
+1.0.0.2 09/03/2026
+Corrigido problema no classifica_ids que não retornava o IdPesquisado
+
 1.0.0.1 05/03/2026
 Corrigido travamento da tabela classes que dava lock na tabela devido ao select
 
