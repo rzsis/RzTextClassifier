@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
-            "python": "/opt/venv_3_11_14/bin/python",
+            "python": "/opt/venv_3_11_14/bin/python"
         }
     ]
 }

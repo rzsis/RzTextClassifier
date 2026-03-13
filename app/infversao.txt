@@ -1,3 +1,6 @@
+1.0.0.3 13/03/2026
+Criado classe para gerar um JSON para treinamento de LLMs
+
 1.0.0.2 09/03/2026
 Corrigido problema no classifica_ids que não retornava o IdPesquisado
 
