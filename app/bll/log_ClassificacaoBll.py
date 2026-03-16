@@ -2,7 +2,7 @@
 from typing import Optional
 from sqlalchemy import text
 from db_utils import Session
-from common import print_with_time, print_error
+from common import print_and_log, print_error
 import logger
 from datetime import datetime
 

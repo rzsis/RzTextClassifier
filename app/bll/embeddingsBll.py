@@ -2,7 +2,7 @@
 import numpy as np
 from db_utils import Session
 from typing import  Dict, List, Optional,Union
-from common import print_with_time
+from common import print_and_log
 import logger
 from transformers import AutoTokenizer,AutoModel
 import torch
@@ -95,7 +95,7 @@ class EmbeddingsBll:
 
         # ---- fallback se torch não estiver carregado ----
         if self.torch_model is None:
-            print_with_time(
+            print_and_log(
                 "[WARNING] torch_model não carregado. Gerando embeddings individualmente usando ONNX, "
                 "o que é mais lento. Chame load_model_and_tokenizer() para carregar o modelo PyTorch."
             )
@@ -207,7 +207,7 @@ class EmbeddingsBll:
             
 
             #tempo_decorrido_min = (time.time() - inicio) / 60          
-            #print_with_time(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
+            #print_and_log(f"Tempo decorrido: {tempo_decorrido_min:.6f} minutos")
 
             return embedding[0].astype("float32") # type: ignore
         except Exception as e:
@@ -219,9 +219,9 @@ class EmbeddingsBll:
             model_path  = self.localconfig.getModelPath()
             # ===== Carrega modelo ONNX para inferência individual =====            
             onnx_file_name = f"{model_path}/bge-m3-dense.onnx"
-            print_with_time(f"[INFO] Carregando tokenizer HF de: {model_path}")
+            print_and_log(f"[INFO] Carregando tokenizer HF de: {model_path}")
 
-            print_with_time(f"[INFO] Carregando modelo ONNX de: {onnx_file_name}")          
+            print_and_log(f"[INFO] Carregando modelo ONNX de: {onnx_file_name}")          
 
             # 1. Carrega o tokenizer (essencial!) para lote
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -233,7 +233,7 @@ class EmbeddingsBll:
             if self.device.type == "cuda":
                 # ===== Carrega modelo PyTorch para indexação em lote (GPU) =====
                 # OBS: aqui usamos o modelo HF original (não ONNX).
-                print_with_time(f"[INFO] Carregando modelo PyTorch para GPU de: {model_path}")
+                print_and_log(f"[INFO] Carregando modelo PyTorch para GPU de: {model_path}")
                 base_model = AutoModel.from_pretrained(
                     model_path,
                     local_files_only=True,

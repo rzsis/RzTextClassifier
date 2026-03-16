@@ -10,7 +10,7 @@ from requests import Session
 from transformers import AutoTokenizer, AutoModel
 import torch
 from tqdm import tqdm
-from common import print_with_time, print_error
+from common import print_and_log, print_error
 from collections import Counter
 from sqlalchemy import text
 import gpu_utils as gpu_utilsModule
@@ -65,8 +65,8 @@ class Export_DAPT:
             with open(dapt_file_path, 'w', encoding='utf-8') as f:
                 json.dump(dapt_data, f, ensure_ascii=False, indent=2)
             result = f"Dataset DAPT salvo com sucesso em: {dapt_file_path}" + "\n"
-            print_with_time(result)
-            print_with_time(f"Total de documentos incluídos no dapt.json: {len(dapt_data)}")
+            print_and_log(result)
+            print_and_log(f"Total de documentos incluídos no dapt.json: {len(dapt_data)}")
             dapt_data.clear()  # Limpa a lista após salvar o arquivo
             return result
         except Exception as e:
@@ -76,14 +76,14 @@ class Export_DAPT:
     #Inicia o processo de geração de embeddings
     def start(self):
         iniTime = time.time()  
-        print_with_time(f"Iniciando geração de arquivos JSON para LLM de {self.model_path} : {iniTime}")
+        print_and_log(f"Iniciando geração de arquivos JSON para LLM de {self.model_path} : {iniTime}")
         dados = self._fetch_data()
         qtdreg = len(dados)
         if qtdreg == 0:
             return {"status": "Completo",
                     "message": f"Não há dados para gerar DataSet LLM. "}
     
-        print_with_time(f"Total de registros a processar: {len(dados)}")
+        print_and_log(f"Total de registros a processar: {len(dados)}")
         tmpErros = ""
         processados = 0        
         dapt_dataset = []        
@@ -101,13 +101,13 @@ class Export_DAPT:
                                      })
                 processados += 1
              
-                print_with_time("Implementar código novo de exportação aqui, pegar todos os textos medir similaridade e só mandar textos diferentes entre as classes")
+                print_and_log("Implementar código novo de exportação aqui, pegar todos os textos medir similaridade e só mandar textos diferentes entre as classes")
                 result += self._save_dapt_file(dapt_dataset,"0128")
              
 
             except Exception as e:
                 tmpErros += f"Erro ao processar registro {i+1}: {e}\n"
-                print_with_time(f"Erro ao processar registro {i+1}: {e}")
+                print_and_log(f"Erro ao processar registro {i+1}: {e}")
                 continue
             
         # Salva o ultimo arquivo DAPT com o saldo de dados
@@ -115,7 +115,7 @@ class Export_DAPT:
 
         elapsed     = time.time() - iniTime
         str_elapsed = f"Duração: {elapsed/60:.2f} min"
-        print_with_time(f"Processamento finalizado. Total processado: {processados}. {str_elapsed}")
+        print_and_log(f"Processamento finalizado. Total processado: {processados}. {str_elapsed}")
 
         if tmpErros != "":
             return {"status": "Processado com erros",

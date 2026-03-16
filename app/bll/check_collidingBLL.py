@@ -4,7 +4,7 @@ from requests import session
 from sqlalchemy.orm import Session
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 from bll.embeddingsBll import EmbeddingsBll
-from common import print_with_time
+from common import print_and_log
 from qdrant_utils import Qdrant_Utils as QdrantUtilsModule
 
 class check_collidingBLL:

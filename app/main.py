@@ -42,7 +42,7 @@ if __name__ == "__main__":
     #bllExportBgeM3ToOnnx.execute()  #  isso foi colocado aqui para gerar facilmente o onnx não deve ser usado em produção
 
     classes_utils.initClassesUtils(common._db.get_session())
-    common.print_with_time(f"Banco vetorial de destino -> {localconfig.get('vectordatabasehost')}")
+    common.print_and_log(f"Banco vetorial de destino -> {localconfig.get('vectordatabasehost')}")
 
     uvicorn.run(
         "main:fastApi",

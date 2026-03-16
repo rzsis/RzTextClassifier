@@ -1,7 +1,7 @@
 #gpu_utils.py
 import torch
 import time
-from common import print_with_time
+from common import print_and_log
 
 class GpuUtils:
     def __init__(self) -> None:
@@ -24,12 +24,12 @@ class GpuUtils:
                 time.sleep(0.1)  # 0.1 segundo a cada 10 limpezas para evitar sobrecarga
 
     def print_gpu_info(self):
-        print_with_time(f"PyTorch: {torch.__version__}")
-        print_with_time(f"Torch CUDA runtime: {torch.version.cuda}")
-        print_with_time(f"Torch built {torch.version.git_version}")
-        print_with_time(f"CUDA disponível: {torch.cuda.is_available()}")                                
+        print_and_log(f"PyTorch: {torch.__version__}")
+        print_and_log(f"Torch CUDA runtime: {torch.version.cuda}")
+        print_and_log(f"Torch built {torch.version.git_version}")
+        print_and_log(f"CUDA disponível: {torch.cuda.is_available()}")                                
 
         if torch.cuda.is_available():
-            print_with_time(f"GPU: {torch.cuda.get_device_name(0)}")
-            print_with_time(f"Driver/CUDA detectados: {torch.version.cuda} | Device count: {torch.cuda.device_count()}")
-            print_with_time(f"Device capability {torch.cuda.get_device_capability()}")  # Should show something like (9, 0) for Blackwell            
+            print_and_log(f"GPU: {torch.cuda.get_device_name(0)}")
+            print_and_log(f"Driver/CUDA detectados: {torch.version.cuda} | Device count: {torch.cuda.device_count()}")
+            print_and_log(f"Device capability {torch.cuda.get_device_capability()}")  # Should show something like (9, 0) for Blackwell            

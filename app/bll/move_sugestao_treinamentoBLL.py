@@ -9,7 +9,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 from sympy import Id
 from torch import embedding
-from common import print_with_time, print_error
+from common import print_and_log, print_error
 import logger
 from qdrant_utils import Qdrant_Utils as Qdrant_UtilsModule
 from bll.check_collidingBLL import check_collidingBLL as check_collidingBLLModule
@@ -63,7 +63,7 @@ class move_sugestao_treinamentoBLL:
                 embeddings=embedding_vector,
                 cod_classe=None                
             )
-            print_with_time(f"Embedding recriado e inserido na collection final para o ID {idBase} na coleção de treinamento.")
+            print_and_log(f"Embedding recriado e inserido na collection final para o ID {idBase} na coleção de treinamento.")
 
             registro = self.qdrant_utils.get_id(id=idBase, collection_name=self.train_collection)
             if not registro:
@@ -502,7 +502,7 @@ class move_sugestao_treinamentoBLL:
 
             total_movido = len(lista_iguais) + len(lista_similares)
             sucessMessage = f"Movidos {total_movido} registros para treinamento e Modelo de IA"
-            print_with_time(sucessMessage)
+            print_and_log(sucessMessage)
             return {
                 "status": "OK",
                 "mensagem": sucessMessage,
@@ -512,7 +512,7 @@ class move_sugestao_treinamentoBLL:
         except Exception as e:
             self.session.rollback()
             errorMessage = f"Erro! ao mover sugestões para treinamento:\n {e}"
-            print_with_time(errorMessage)
+            print_and_log(errorMessage)
             return {
                 "status": "ERROR",
                 "mensagem": errorMessage

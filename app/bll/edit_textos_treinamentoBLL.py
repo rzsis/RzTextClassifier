@@ -8,7 +8,7 @@ from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondit
 from sqlalchemy import RowMapping, Sequence, text
 from tqdm import tqdm
 from sqlalchemy.orm import Session
-from common import print_with_time, print_error, get_localconfig
+from common import print_and_log, print_error, get_localconfig
 import bll.embeddingsBll as embeddingsBllModule
 import gpu_utils as gpu_utilsModule
 import logger
@@ -42,7 +42,7 @@ class edit_textos_treinamentoBLL:
             """)
             self._session.execute(sql, {"codClasse": codClasse, "id": id})
             self._session.commit()
-            print_with_time(f"Texto de treinamento com ID {id} atualizado para a classe {codClasse}.")
+            print_and_log(f"Texto de treinamento com ID {id} atualizado para a classe {codClasse}.")
         except Exception as e:
             self._session.rollback()
             raise RuntimeError(f"Erro ao editar o texto de treinamento com ID {id}: {str(e)}")            

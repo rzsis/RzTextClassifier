@@ -1,0 +1,188 @@
+Log com stacktrace real nas exceções
+
+Hoje algumas exceções podem perder o stacktrace.
+
+Exemplo no decorator:
+
+def log_errors(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            raise Exception(f"Erro em {fn.__name__}")
+
+Problemas:
+
+perde o stack original
+
+não registra no log
+
+dificulta debug
+
+Melhor versão
+def log_errors(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            log.exception(f"Erro em {fn.__name__}")
+            raise
+    return wrapper
+
+log.exception() grava automaticamente:
+
+stacktrace completo
+
+mensagem
+
+2️⃣ Tornar o logger thread-safe para alta concorrência
+
+Aplicações FastAPI podem ter muitas requisições simultâneas.
+
+Uma abordagem melhor é usar QueueHandler + QueueListener, evitando bloqueio de IO.
+
+Exemplo conceitual:
+
+import logging
+import logging.handlers
+import queue
+
+log_queue = queue.Queue()
+
+queue_handler = logging.handlers.QueueHandler(log_queue)
+file_handler = RotatingFileHandler("app.log")
+
+listener = logging.handlers.QueueListener(log_queue, file_handler)
+listener.start()
+
+Benefícios:
+
+logs não bloqueiam requisições
+
+melhor desempenho sob carga
+
+3️⃣ Corrigir caminho do log (problema comum em produção)
+
+Você usa:
+
+log_path = "../log/"
+
+Problema:
+
+depende de diretório de execução
+
+systemd / docker pode quebrar isso
+
+Melhor abordagem
+BASE_DIR = Path(__file__).resolve().parent
+log_path = BASE_DIR / "../log"
+log_path.mkdir(exist_ok=True)
+
+Ou melhor ainda:
+
+log_path = Path(os.getenv("LOG_PATH", "./log"))
+4️⃣ Log estruturado (JSON) para observabilidade
+
+Hoje você grava texto simples:
+
+"%(message)s"
+
+Em produção (Kibana / Loki / Datadog) o ideal é JSON logs.
+
+Exemplo:
+
+import json
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "time": datetime.now().isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module
+        })
+
+Resultado:
+
+{
+  "time": "2026-03-13T18:10:11",
+  "level": "ERROR",
+  "message": "Erro no banco",
+  "module": "db"
+}
+5️⃣ Incluir request-id no log (muito útil em APIs)
+
+Para rastrear uma requisição inteira.
+
+Exemplo:
+
+request_id=abc123 GET /users
+request_id=abc123 erro no banco
+
+Implementação comum com middleware.
+
+import uuid
+
+@app.middleware("http")
+async def add_request_id(request, call_next):
+    request.state.request_id = str(uuid.uuid4())
+    response = await call_next(request)
+    return response
+
+Depois no log:
+
+[request_id] mensagem
+6️⃣ Integrar logs do Uvicorn
+
+Atualmente seu logger não captura logs do Uvicorn.
+
+Ideal:
+
+logging.getLogger("uvicorn.error").handlers = log.handlers
+logging.getLogger("uvicorn.access").handlers = log.handlers
+
+Assim tudo vai para o mesmo arquivo.
+
+7️⃣ Capturar shutdown / startup errors
+
+Adicionar eventos do FastAPI.
+
+@app.on_event("startup")
+async def startup():
+    info("Aplicação iniciada")
+
+@app.on_event("shutdown")
+async def shutdown():
+    info("Aplicação finalizada")
+8️⃣ Melhorar timestamp
+
+Hoje você concatena manualmente:
+
+log.info(f"{_getDateTimeStr()} {txt}")
+
+Melhor deixar o próprio logger fazer isso:
+
+fmt = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s"
+)
+
+Assim:
+
+2026-03-13 18:11:03 [ERROR] erro no banco
+9️⃣ Evitar variável global log
+
+Global funciona, mas pode gerar problemas em import.
+
+Melhor:
+
+def get_logger():
+    return logging.getLogger("app")
+⭐ As 3 melhorias mais importantes (prioridade)
+
+Se eu estivesse colocando em produção hoje, faria primeiro:
+
+1️⃣ log.exception() no decorator
+2️⃣ log JSON estruturado
+3️⃣ capturar logs do Uvicorn
+
+Essas três já aumentam muito a capacidade de observabilidade.

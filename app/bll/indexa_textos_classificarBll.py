@@ -10,7 +10,7 @@ from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondit
 from sqlalchemy import RowMapping, Sequence, text
 from tqdm import tqdm
 from sqlalchemy.orm import Session
-from common import print_with_time, print_error, get_localconfig
+from common import print_and_log, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
@@ -107,7 +107,7 @@ class indexa_textos_classificarBll:
             self.session.execute(text(query), {"ids": tuple(id)})
             self.session.commit()                       
         except Exception as e:
-            print_with_time(f"Erro ao marcar id {id} como indexado: {e}")
+            print_and_log(f"Erro ao marcar id {id} como indexado: {e}")
             self.session.rollback()
 
 
@@ -117,7 +117,7 @@ class indexa_textos_classificarBll:
             # Filtra apenas os registros com UpInsertOk=True
             ids_to_update = [item['Id'] for item in processados if item['UpInsertOk']]
             if not ids_to_update:
-               print_with_time("Nenhum texto para marcar como indexado.")
+               print_and_log("Nenhum texto para marcar como indexado.")
                return
 
             query = """
@@ -128,7 +128,7 @@ class indexa_textos_classificarBll:
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})
             self.session.commit()            
         except Exception as e:
-            print_with_time(f"Erro ao marcar textos como indexados em lote: {e}")
+            print_and_log(f"Erro ao marcar textos como indexados em lote: {e}")
             self.session.rollback()
 
     def _insert_text_list_qdrant(self, processed_data: list[dict]) -> list[dict]:
@@ -161,11 +161,11 @@ class indexa_textos_classificarBll:
             else:
                 for item in processed_data:
                     item['UpInsertOk'] = False
-                print_with_time(f"Falha ao inserir textos no Qdrant: status {result.status}")
+                print_and_log(f"Falha ao inserir textos no Qdrant: status {result.status}")
             
             return processed_data
         except Exception as e:
-            print_with_time(f"Erro ao inserir lista de textos no Qdrant: {e}")
+            print_and_log(f"Erro ao inserir lista de textos no Qdrant: {e}")
             for item in processed_data:
                 item['UpInsertOk'] = False
             return processed_data
@@ -175,12 +175,12 @@ class indexa_textos_classificarBll:
     def indexa_textos_classificar(self) -> dict:
         total_indexados = 0
         inicio = time.time()
-        print_with_time(f"Iniciando indexação de textos a classificar...")
+        print_and_log(f"Iniciando indexação de textos a classificar...")
         self.clusters = {} # Reseta cache
         data = self._fetch_data_not_indexed()
         if not data:
             sucessMessage = "Nenhum texto pendente para processar."
-            print_with_time(sucessMessage)
+            print_and_log(sucessMessage)
             return {
                 "status": "OK",
                 "mensagem": sucessMessage,
@@ -203,7 +203,7 @@ class indexa_textos_classificarBll:
                 for j, embedding in enumerate(embeddings):
                 # ✅ FILTRO OBRIGATÓRIO
                     if embedding is None:
-                        print_with_time(f"Aviso: Embedding nulo para id {ids[j]}, texto vazio.")
+                        print_and_log(f"Aviso: Embedding nulo para id {ids[j]}, texto vazio.")
                         ids_invalidos.append(ids[j]) 
                         continue                    
 
@@ -228,7 +228,7 @@ class indexa_textos_classificarBll:
                 ids_invalidos = []  # Reseta a lista de ids inválidos após o processamento do batch                    
 
             except Exception as e:
-                print_with_time(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
+                print_and_log(f"Erro ao gerar embeddings para batch starting at id {ids[0]}: {e}")
         
         self.gpu_utils.clear_gpu_cache()
 
@@ -236,7 +236,7 @@ class indexa_textos_classificarBll:
 
         tempo_decorrido_min = (time.time() - inicio) / 60
         sucessMessage = f"Indexados {total_indexados} textos pendentes no Qdrant, Tempo decorrido: {tempo_decorrido_min:.2f} minutos"
-        print_with_time(sucessMessage)
+        print_and_log(sucessMessage)
         return {
             "status": "OK",
             "mensagem": sucessMessage,

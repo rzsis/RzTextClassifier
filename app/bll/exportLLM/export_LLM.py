@@ -9,7 +9,7 @@ from requests import Session
 from tqdm import tqdm
 
 import localconfig
-from common import print_with_time, print_error
+from common import print_and_log, print_error
 from qdrant_utils import Qdrant_Utils
 from bll.embeddingsBll import get_bllEmbeddings
 from dbClasses.classes_utils import initClassesUtils
@@ -69,12 +69,12 @@ class Export_LLM:
             return False
 
         except Exception as e:
-            print_with_time(f"Erro ao buscar similares para o id {text_id}: {e}")
+            print_and_log(f"Erro ao buscar similares para o id {text_id}: {e}")
             return False
 
     def start(self):
         iniTime = time.time()
-        print_with_time(f"Iniciando exportação de dados para Dataset LLM: {iniTime}")
+        print_and_log(f"Iniciando exportação de dados para Dataset LLM: {iniTime}")
 
         dados = self._fetch_data()
         qtdreg = len(dados)
@@ -82,7 +82,7 @@ class Export_LLM:
         if qtdreg == 0:
             return {"status": "Completo", "message": "Não há dados para exportar."}
 
-        print_with_time(f"Total de registros a processar: {qtdreg}")
+        print_and_log(f"Total de registros a processar: {qtdreg}")
         
         tmpErros = ""
         processados = 0
@@ -126,7 +126,7 @@ class Export_LLM:
                 processados += 1
             except Exception as e:
                 tmpErros += f"Erro ao processar item com id {text_id}: {e}\n"
-                print_with_time(f"Erro no processamento do item {text_id}: {e}")
+                print_and_log(f"Erro no processamento do item {text_id}: {e}")
                 continue
 
         # Salvando em arquivo
@@ -139,14 +139,14 @@ class Export_LLM:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(dataset, f, ensure_ascii=False, indent=2)
             result_msg = f"Dataset salvo com sucesso. Endereço: {file_path}. Documentos totais: {exportados}."
-            print_with_time(result_msg)
+            print_and_log(result_msg)
         except Exception as e:
             print_error(f"Erro ao salvar arquivo JSON: {e}")
             tmpErros += f"Erro de File IO: {e}\n"
 
         elapsed = time.time() - iniTime
         str_elapsed = f"Duração: {elapsed/60:.2f} min"
-        print_with_time(f"Processamento export_LLM finalizado. Total avaliados: {processados}, Exportados: {exportados}. {str_elapsed}")
+        print_and_log(f"Processamento export_LLM finalizado. Total avaliados: {processados}, Exportados: {exportados}. {str_elapsed}")
 
         if tmpErros != "":
             return {

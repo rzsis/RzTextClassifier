@@ -16,7 +16,7 @@ _localconfig = None
 
 last_print_time = time.time()
 
-def print_with_time(message):
+def print_and_log(message):
     global last_print_time
     current_time = time.time()
     elapsed_time = current_time - last_print_time

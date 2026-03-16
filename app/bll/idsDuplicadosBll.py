@@ -1,7 +1,7 @@
 # db_idsduplicados.py
 from sqlalchemy import text
 from db_utils import Session
-from common import print_with_time, print_error
+from common import print_and_log, print_error
 import logger
 
 class IdsDuplicados:
@@ -29,6 +29,6 @@ class IdsDuplicados:
             )
             session.commit()            
         except Exception as e:            
-            print_with_time(f"Error inserting duplicate text (ID: {idBase}): {e}")
+            print_and_log(f"Error inserting duplicate text (ID: {idBase}): {e}")
             session.rollback()
         

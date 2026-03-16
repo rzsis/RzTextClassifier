@@ -9,7 +9,7 @@ from sympy import Id
 import torch
 from tqdm import tqdm
 from sqlalchemy.orm import Session
-from common import print_with_time, print_error, get_localconfig
+from common import print_and_log, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
@@ -125,11 +125,11 @@ class ClassificaTextosPendentesBll:
                     session.commit()
                     self.logger.info(f"Successfully committed batch of {len(batch)} classification logs")
                 except Exception as e:                    
-                    print_with_time(f"Error inserting batch of {len(batch)} classification logs: {e}")
+                    print_and_log(f"Error inserting batch of {len(batch)} classification logs: {e}")
                     session.rollback()
                     continue
         except Exception as e:            
-            print_with_time(f"Error processing batch classification logs: {e}")
+            print_and_log(f"Error processing batch classification logs: {e}")
             session.rollback()            
 
 
@@ -137,7 +137,7 @@ class ClassificaTextosPendentesBll:
     def classifica_textos_pendentes(self) -> dict[str, Any]:
         from bll.sugere_textos_classificarBll import sugere_textos_classificarBll as sugere_textos_classificarBLLModule
 
-        print_with_time(f"Iniciando processamento para classificação de textos a classificar pendentes...")
+        print_and_log(f"Iniciando processamento para classificação de textos a classificar pendentes...")
 
         embeddingsBllModule.initBllEmbeddings(session=self.session)  # inicializa bllEmbeddings se ainda não foi inicializado
                 
@@ -172,7 +172,7 @@ class ClassificaTextosPendentesBll:
     
 
         sucessMessage = f"Processados {len(lista_log_classificacao)} textos a classificar pendentes."
-        print_with_time(sucessMessage)
+        print_and_log(sucessMessage)
         
         sugere_textos_classificarBll = sugere_textos_classificarBLLModule(self.session)                
         sugere_textos_classificarBll.sugere_textos_para_classificar()        

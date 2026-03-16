@@ -49,12 +49,12 @@ class Session:
             self.engine = None
 
     def test_connection(self):
-        from common import print_with_time        
+        from common import print_and_log        
         try:
             with self.engine.connect() as conn:
-                print_with_time(f"Conexão com banco de dados {self.banco} no host {self.host} estabelecida com sucesso")
+                print_and_log(f"Conexão com banco de dados {self.banco} no host {self.host} estabelecida com sucesso")
                 return True
         except Exception as e:
-            print_with_time(f"Erro ao conectar com o banco de dados {self.banco} no host {self.host}")
+            print_and_log(f"Erro ao conectar com o banco de dados {self.banco} no host {self.host}")
             return False
             

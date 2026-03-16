@@ -12,7 +12,7 @@ from qdrant_client.http.models import Distance, PointStruct, Filter, FieldCondit
 from sqlalchemy import RowMapping, Sequence, text
 from tqdm import tqdm
 from sqlalchemy.orm import Session
-from common import print_with_time, print_error, get_localconfig
+from common import print_and_log, print_error, get_localconfig
 from bll.classifica_textoBll import classifica_textoBll as classifica_textoBllModule
 import bll.embeddingsBll as embeddingsBllModule
 from bll.log_ClassificacaoBll import LogClassificacaoBll as LogClassificacaoBllModule
@@ -158,14 +158,14 @@ class sugere_textos_classificarBll:
                 return 0
             return len(texto.strip().split())
         except Exception as e:
-            print_with_time(f"Erro em _get_QtdPalavras: {e}")
+            print_and_log(f"Erro em _get_QtdPalavras: {e}")
             return 0    
 
     #processa os textos duplicados encontrados inserindo na sugestao_textos_classificar 
     def _processa_textos_duplicados(self,data) -> str:
         try:
             if len(data) == 0:
-                print_with_time("Sem textos duplicados para processar")
+                print_and_log("Sem textos duplicados para processar")
                 return ""
                            
             qtd_inserido_similares = 0
@@ -220,11 +220,11 @@ class sugere_textos_classificarBll:
                     self.session.commit()
 
             retorno = f"Inseridos {qtd_inserido} textos duplicados + altamente similares {qtd_inserido_similares}"
-            print_with_time(retorno)
+            print_and_log(retorno)
             return retorno
         except Exception as e:  
             retorno = f"Erro ao processar textos duplicados: {e}"
-            print_with_time(retorno)
+            print_and_log(retorno)
             return retorno
 
 
@@ -362,7 +362,7 @@ class sugere_textos_classificarBll:
             lista_similares = [item.__dict__ for item in result.ListaSimilaridade if item.IdEncontrado not in self.lista_sugestao_textos_classificar] # type: ignore
             return lista_similares
         except Exception as e:
-            print_with_time(f"erro em get_similares {e} ")
+            print_and_log(f"erro em get_similares {e} ")
             
     #obtem uma lista de sugestao_textos_classificar ja inseridos no banco gerando uma lista dupla com IdSimilar e IdBase igual
     #pois uma vez um IdInserido ele não deve ser considerado similar a outro logo não deve ser inserido novamente
@@ -477,7 +477,7 @@ class sugere_textos_classificarBll:
             """
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})         
         except Exception as e:
-            print_with_time(f"Erro ao marcar textos como buscou similar em lote: {e}")
+            print_and_log(f"Erro ao marcar textos como buscou similar em lote: {e}")
             self.session.rollback()
 
     #Incrementa o nível de similaridade para os textos processados
@@ -492,7 +492,7 @@ class sugere_textos_classificarBll:
             """
             self.session.execute(text(query), {"ids": tuple(ids_to_update)})        
         except Exception as e:
-            print_with_time(f"Erro ao marcar textos como buscou similar em lote: {e}")
+            print_and_log(f"Erro ao marcar textos como buscou similar em lote: {e}")
             self.session.rollback()            
 
 
@@ -524,7 +524,7 @@ class sugere_textos_classificarBll:
                     self.similares_inseridos += len(lista_similares)
 
         except Exception as e:
-           print_with_time(f"Erro ao inserir similares para texto id {id_texto}: {e}")   
+           print_and_log(f"Erro ao inserir similares para texto id {id_texto}: {e}")   
 
     #atualiza os campos DataEvento e QtdPalavras na tabela sugestao_textos_classificar para aumentar a performance nas consultas
     #faz somente aqui pois pegar essa informação na hora da consulta é muito custoso
@@ -555,7 +555,7 @@ class sugere_textos_classificarBll:
 
             self.session.execute(text(query))
         except Exception as e:
-            print_with_time(f"Erro em _update_textos_classificar: {e}")
+            print_and_log(f"Erro em _update_textos_classificar: {e}")
             self.session.rollback()
 
     #para depois o usuario sugerir classificações
@@ -568,19 +568,19 @@ class sugere_textos_classificarBll:
             indexa_textos_classificarBll = indexa_textos_classificarBllModule(session=self.session)
             indexa_textos_classificarBll.indexa_textos_classificar()
 
-            print_with_time(f"Iniciando busca de textos duplicados...")
+            print_and_log(f"Iniciando busca de textos duplicados...")
             self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem a lista atual ja inserida em sugestao_textos_classificar ja inserido no banco
             if (ContadorEntrada == 1):
                 data = self._get_lista_textos_duplicados()
                 pSucessMessage += self._processa_textos_duplicados(data)                     
 
-            print_with_time(f"Iniciando busca de textos similares Nivel {ContadorEntrada}...")
+            print_and_log(f"Iniciando busca de textos similares Nivel {ContadorEntrada}...")
             data = self._get_textos_falta_buscar_similar()
             self.lista_sugestao_textos_classificar = self._get_list_sugestao_textos_classificar()#obtem denovo a lista atual ja inserida em sugestao_textos_classificar 
 
             if not data:
                 sucessMessage = "Nenhum texto similar restante para classificar"
-                print_with_time(sucessMessage)
+                print_and_log(sucessMessage)
                 return {
                     "status": "OK",
                     "processados": sucessMessage,
@@ -594,7 +594,7 @@ class sugere_textos_classificarBll:
                     self._insere_similares(row['id'], lista_similares, 3)
                 
                 except Exception as e:
-                    print_with_time(f"Erro ao buscar similar de texto id {row['id']}: {e}")
+                    print_and_log(f"Erro ao buscar similar de texto id {row['id']}: {e}")
 
             self._inc_nivel_similaridade(data)
             self.gpu_utils.clear_gpu_cache()
@@ -608,11 +608,11 @@ class sugere_textos_classificarBll:
             
             #aqui caso faltem itens e o nivel de busca seja menor que 5 faz uma nova chamada recursiva para buscar mais similares
             if (itens_restantes > 0) and (ContadorEntrada <= NivelBuscaSimilar): 
-                print_with_time(f"{sucessMessage} no nível {ContadorEntrada}, buscando próximos níveis...")                   
+                print_and_log(f"{sucessMessage} no nível {ContadorEntrada}, buscando próximos níveis...")                   
                 self.sugere_textos_para_classificar(NivelBuscaSimilar, ContadorEntrada+1,pSucessMessage=totalSucessMessage)        
                 itens_restantes = self._get_qtd_textos_falta_buscar_similar()
                 
-            print_with_time(totalSucessMessage)
+            print_and_log(totalSucessMessage)
             return {
                 "status": "OK",
                 "mensagem": totalSucessMessage,

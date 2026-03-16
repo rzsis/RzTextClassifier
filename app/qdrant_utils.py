@@ -8,7 +8,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.models import Filter, HasIdCondition
 from qdrant_client.http.models import Distance,  FieldCondition, MatchValue
-from common import print_with_time, print_error, get_localconfig
+from common import print_and_log, print_error, get_localconfig
 import re
 import requests
 from importlib.metadata import version as pkg_version
@@ -37,7 +37,7 @@ class Qdrant_Utils:
                 return True
             
             self._qdrant_client = QdrantClient(url=self._qdrant_url, timeout=60)
-            print_with_time(f"QdrantClient inicializado com URL: {self._qdrant_url}")
+            print_and_log(f"QdrantClient inicializado com URL: {self._qdrant_url}")
           
             self._check_client_server_compatibility()  # checar compatibilidade client x server
 
@@ -54,8 +54,8 @@ class Qdrant_Utils:
             self._qdrant_client.get_collections()# Faz uma consulta simples para verificar a conexão
             return True
         except (ConnectionError, UnexpectedResponse, Exception) as e:
-            print_with_time(f"Tipo: {type(e)} Repr: {repr(e)}")      
-            print_with_time(f"Exception {e} ao verificar conexão com Qdrant.")            
+            print_and_log(f"Tipo: {type(e)} Repr: {repr(e)}")      
+            print_and_log(f"Exception {e} ao verificar conexão com Qdrant.")            
             return False
             
     #obtem o cliente do qdrant  
@@ -116,7 +116,7 @@ class Qdrant_Utils:
                                                        distance=Distance.COSINE  
                                                     )
                 )
-                print_with_time(f"Criada collection Qdrant: {pCollection_name}")
+                print_and_log(f"Criada collection Qdrant: {pCollection_name}")
 
         except Exception as e:
             raise RuntimeError(f"Erro criando create_collection no banco vetorial: {e}")
@@ -130,7 +130,7 @@ class Qdrant_Utils:
             last_indexed = -1
             stable_since = None
 
-            print_with_time("Forçando reindexação da coleção...")
+            print_and_log("Forçando reindexação da coleção...")
 
             self._qdrant_client.update_collection(
                 collection_name=collection_name,
@@ -146,7 +146,7 @@ class Qdrant_Utils:
 
             while True:
                 if time.time() - start_time > timeout:
-                    print_with_time("Timeout aguardando estabilização da indexação.")
+                    print_and_log("Timeout aguardando estabilização da indexação.")
                     return False
 
                 info = self._qdrant_client.get_collection(collection_name)
@@ -156,7 +156,7 @@ class Qdrant_Utils:
                     if stable_since is None:
                         stable_since = time.time()
                     elif time.time() - stable_since >= stable_window:
-                        print_with_time(
+                        print_and_log(
                             f"Indexação estabilizada em {indexed} vetores."
                         )
                         return True
@@ -167,7 +167,7 @@ class Qdrant_Utils:
                 time.sleep(2)
 
         except Exception as e:
-            print_with_time(f"Erro ao forçar reindexação: {e}")
+            print_and_log(f"Erro ao forçar reindexação: {e}")
             return False
 
     # Busca embeddings similares no qdrant
@@ -208,7 +208,7 @@ class Qdrant_Utils:
             return high_similars
         
         except Exception as e:
-            print_with_time(f"Erro em search_embedding no banco vetorial {e}")
+            print_and_log(f"Erro em search_embedding no banco vetorial {e}")
             raise RuntimeError(f"Erro em search_embedding no banco vetorial: {e}")
         
     def search_embedding_and_metaData(self,
@@ -282,7 +282,7 @@ class Qdrant_Utils:
 
         except Exception as e:
             erro = f"Erro em search_embedding_and_metaData no banco vetorial: {e}"
-            print_with_time(erro)
+            print_and_log(erro)
             raise RuntimeError(erro)
 
 
@@ -295,7 +295,7 @@ class Qdrant_Utils:
                 with_payload=["CodClasse"]
             )
             if not records:
-                print_with_time(f"Aviso: Id {id} não encontrado no banco vetorial, pulando")
+                print_and_log(f"Aviso: Id {id} não encontrado no banco vetorial, pulando")
                 return None
 
             rec = records[0]
@@ -304,17 +304,17 @@ class Qdrant_Utils:
                 vec = vec.get(self.vector_name)  # por ex. "text"            
                 
             if vec is None:
-                print_with_time(f"Aviso: Id {id} não possui vetor no banco vetorial, pulando")
+                print_and_log(f"Aviso: Id {id} não possui vetor no banco vetorial, pulando")
                 return None
 
             try:
                 embedding = [float(x) for x in vec]
 
                 if len(embedding) != self.collectionSize:
-                    print_with_time(f"Aviso: Vetor do Id {id} tem dimensão {len(embedding)}, esperado {self.collectionSize}")
+                    print_and_log(f"Aviso: Vetor do Id {id} tem dimensão {len(embedding)}, esperado {self.collectionSize}")
                     return None
             except Exception:
-                print_with_time(f"Aviso: Vetor do Id {id} não é numérico, pulando")
+                print_and_log(f"Aviso: Vetor do Id {id} não é numérico, pulando")
                 return None
 
             payload = rec.payload or {}
@@ -327,7 +327,7 @@ class Qdrant_Utils:
                 "Embedding": np.array(embedding, dtype=np.float32)
             }
         except Exception as e:
-            print_with_time(f"Erro ao recuperar embedding para Id {id}: {e}")
+            print_and_log(f"Erro ao recuperar embedding para Id {id}: {e}")
             return None
     
     def delete_id(self,
@@ -339,7 +339,7 @@ class Qdrant_Utils:
                 points_selector=models.PointIdsList(points=[id])
             )
         except Exception as e:
-            print_with_time(f"Erro ao apagar Id {id}: {e}")
+            print_and_log(f"Erro ao apagar Id {id}: {e}")
 
     #Insere ou atualiza um ID no qdrant
     def upinsert_id(self,collection_name:str, id:int, embeddings: np.ndarray, cod_classe:int ) -> bool:
@@ -490,7 +490,7 @@ class Qdrant_Utils:
 
         # Se não conseguirmos obter a versão do servidor, não bloqueia — apenas informa.
         if not server_ver:
-            print_with_time(
+            print_and_log(
                 f"[AVISO] Não foi possível detectar a versão do servidor Qdrant em {self._qdrant_url}. "
                 f"Versão do client: {client_ver}"
             )
@@ -510,5 +510,5 @@ class Qdrant_Utils:
             raise RuntimeError(msg)
 
         # Caso compatível, apenas log informativo
-        print_with_time(f"Compatibilidade qdrant com client ok: client {client_ver} ~ server {server_ver}")
+        print_and_log(f"Compatibilidade qdrant com client ok: client {client_ver} ~ server {server_ver}")
 

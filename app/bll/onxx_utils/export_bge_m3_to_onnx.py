@@ -12,7 +12,7 @@ import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
 import onnx
 from bll.onxx_utils.onnx_semantic_validation import OnnxSemanticValidator
-from common import print_with_time
+from common import print_and_log
 import localconfig
 import bll.onxx_utils.dense_embedding_wrapper as dense_embedding_wrapperModule
 
@@ -280,7 +280,7 @@ def validate_onnx_semantic_search(cfg: BgeM3OnnxExporter):
 # =========================
 
 def execute():
-    print_with_time("Convertendo modelo  BGE-M3 para ONNX...")    
+    print_and_log("Convertendo modelo  BGE-M3 para ONNX...")    
 
     exporter = BgeM3OnnxExporter()    
     exporter.clean_destination_directory(exporter.dest_path)    
@@ -288,11 +288,11 @@ def execute():
     
     onnx_path = exporter.export()
     onnx.checker.check_model(onnx_path)
-    print_with_time(f"Modelo ONNX gerado com sucesso em: {onnx_path}")
+    print_and_log(f"Modelo ONNX gerado com sucesso em: {onnx_path}")
 
     exporter.export_secondary_files()
     validate_onnx_semantic_search(exporter)   
     validate_hf_semantic_search(exporter)
           
 
-    print_with_time("ONNX válidado com sucesso")    
+    print_and_log("ONNX válidado com sucesso")    

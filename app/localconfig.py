@@ -28,8 +28,6 @@ def checkRequiredKeys():
     required_keys = [
         "DataBaseConnectString",
         "model_path",        
-        "embeddingsFinal",
-        "embeddingsTrain",
         "http_port",
         "dataset_path",
         "batch_size",
@@ -82,11 +80,6 @@ def getModelPath() -> Path:
     model_path = Path(__configReaded["model_path"])
     return model_path
 
-def getEmbendingFinal() -> str:
-    return os.path.join(__configReaded["embeddingsFinal"], getModelName())
-
-def getEmbeddingsTrain() -> str:
-    return os.path.join(__configReaded["embeddingsTrain"], getModelName())
 
 def get(chave) -> str:
     if chave not in __configReaded:

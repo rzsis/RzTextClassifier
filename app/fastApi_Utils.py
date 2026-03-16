@@ -15,12 +15,12 @@ from controllers import finetuning_contoller
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        common.print_with_time("Inicializando classes_utils por worker")
+        common.print_and_log("Inicializando classes_utils por worker")
         common._db.test_connection()            
         classes_utils.initClassesUtils(common._db.get_session())
     finally:
         yield
-        common.print_with_time("Worker finalizado")
+        common.print_and_log("Worker finalizado")
 
 
 class FastApi_Utils:

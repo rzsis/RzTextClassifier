@@ -54,7 +54,7 @@ def build_logger(appName: str) -> logging.Logger:
         return log
     except Exception as e:     
         # 🔴 E encerra a aplicação → systemd para o serviço        
-        print(f"Erro na inicialização do logger {e}")#não pode usar print_with_time aqui, pois logger pode não estar inicializado        
+        print(f"Erro na inicialização do logger {e}")#não pode usar print_and_log aqui, pois logger pode não estar inicializado        
         sys.exit(1)
 
 # -----------------------------
