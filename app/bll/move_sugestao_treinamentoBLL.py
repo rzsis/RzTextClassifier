@@ -4,7 +4,6 @@ from datetime import datetime
 import string
 from sys import exception
 from typing import Any, Optional
-from networkx import reconstruct_path
 from pkg_resources import UnknownExtra
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
@@ -18,8 +17,7 @@ from bll.salva_log_AlteracoesBll import salva_log_AlteracoesBll as salva_log_Alt
 import bll.embeddingsBll as embeddingsBllModule
 import numpy as np
 
-class move_sugestao_treinamentoBLL:
-    
+class move_sugestao_treinamentoBLL:    
     #Inicializa a classe para mover sugestões de classificação do banco de dados para treinamento para o oficial usando Qdrant e SQL
     def __init__(self, session: Session):
         try:
@@ -97,11 +95,14 @@ class move_sugestao_treinamentoBLL:
                     SELECT tc.id
                         from  textos_classificar tc
                         inner join sugestao_textos_classificar stc on tc.id = stc.IdSimilar 
-                        WHERE  tc.TxtTreinamento = '{texto_treinamento}'
-                        and tc.id in (select IdSimilar  from sugestao_textos_classificar where idBase = {idBase})
+                        WHERE  tc.TxtTreinamento = :texto_query
+                        and tc.id in (select IdSimilar  from sugestao_textos_classificar where idBase = :idBase)
             """
 
-            rows = self.session.execute(text(query)).scalars().all()    
+            rows = self.session.execute(text(query), 
+                                        {"texto_query": texto_treinamento, 
+                                         "idBase": idBase}).scalars().all()                
+
             if not rows:
                 return lista_similares
                                               
@@ -368,16 +369,7 @@ class move_sugestao_treinamentoBLL:
                 self._delete_texto_classificar(id=idBase)                
                 self.qdrant_utils.delete_id(collection_name=self.train_collection, id=idBase) #apaga do qdrant de treinamento                   
                 return
-                
-
-            # #verifica se o unico que sobrou como sugestão é ele mesmo ai pode apagar também
-            # query = f"SELECT COUNT(*) FROM sugestao_textos_classificar WHERE (IdBase = :IdBase) and (IdSimilar = :IdBase)"
-            # result = self.session.execute(text(query), {"IdBase": idBase}).scalar()
-            # if result == 1:
-            #     #se não tiver mais registros deve apagar o idBase da tabela textos_classificar
-            #     self._delete_texto_classificar(id=idBase)                
-            #     self.qdrant_utils.delete_id(collection_name=self.train_collection, id=idBase) #apaga do qdrant de treinamento                                   
-                
+        
         except Exception as e:
             raise RuntimeError(f"Erro ao limpar idBase sem similares {idBase}: {e}")
         

@@ -1,3 +1,6 @@
+1.0.0.4 16/03/2026
+Corrigido problema em _get_ids_similares_adicionais quando havia caracteres que geravam sugeira na busca de texto
+
 1.0.0.3 13/03/2026
 Criado classe para gerar um JSON para treinamento de LLMs
 
