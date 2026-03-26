@@ -12,7 +12,7 @@ import localconfig
 from common import print_and_log, print_error
 from qdrant_utils import Qdrant_Utils
 from bll.embeddingsBll import get_bllEmbeddings
-from dbClasses.classes_utils import initClassesUtils
+from dbClasses.classes_utils import initClassesUtils, get_ClassesUtils
 
 class Export_LLM:
     def __init__(self, session: Session):
@@ -72,6 +72,36 @@ class Export_LLM:
             print_and_log(f"Erro ao buscar similares para o id {text_id}: {e}")
             return False
 
+    def _build_full_dataset(self, dados: list) -> list:
+        dataset_full = []
+        for row in dados:
+            txt = row["TxtTreinamento"].strip()
+            if not txt:
+                continue
+
+            cod_classe = row["CodClasse"]
+            dataset_full.append({
+                "text": txt,
+                "label": cod_classe,
+                "label_text": get_ClassesUtils().get_nome_classe(cod_classe),
+                "id": row["id"]
+            })
+
+        return dataset_full
+
+    def _save_datasets(self, output_path: str, dataset_train: list, dataset_full: list) -> tuple:
+        codcli = self.localconfig.get("codcli")
+        train_file_path = os.path.join(output_path, f"{codcli}_dataset_train.json")
+        full_file_path = os.path.join(output_path, f"{codcli}_dataset_full.json")
+
+        with open(train_file_path, "w", encoding="utf-8") as f:
+            json.dump(dataset_train, f, ensure_ascii=False, indent=2)
+
+        with open(full_file_path, "w", encoding="utf-8") as f:
+            json.dump(dataset_full, f, ensure_ascii=False, indent=2)
+
+        return train_file_path, full_file_path
+
     def start(self):
         iniTime = time.time()
         print_and_log(f"Iniciando exportação de dados para Dataset LLM: {iniTime}")
@@ -88,6 +118,7 @@ class Export_LLM:
         processados = 0
         exportados = 0
         dataset = []
+        dataset_full = self._build_full_dataset(dados)
         exported_ids = set()
 
         for row in tqdm(dados, desc="Avaliando similaridade para Exportação LLM"):
@@ -118,6 +149,7 @@ class Export_LLM:
                         dataset.append({
                             "text": txt,
                             "label": cod_classe,
+                            "label_text": get_ClassesUtils().get_nome_classe(cod_classe),
                             "id": text_id
                         })
                         exported_ids.add(text_id)
@@ -132,13 +164,15 @@ class Export_LLM:
         # Salvando em arquivo
         output_path = self.localconfig.get("dataset_path")
         os.makedirs(output_path, exist_ok=True)
-        file_path = os.path.join(output_path, "dataset_llm.json")
 
         result_msg = ""
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(dataset, f, ensure_ascii=False, indent=2)
-            result_msg = f"Dataset salvo com sucesso. Endereço: {file_path}. Documentos totais: {exportados}."
+            train_file_path, full_file_path = self._save_datasets(output_path, dataset, dataset_full)
+            result_msg = (
+                f"Datasets salvos com sucesso. "
+                f"Train: {train_file_path} (documentos: {exportados}). "
+                f"Full: {full_file_path} (documentos: {len(dataset_full)})."
+            )
             print_and_log(result_msg)
         except Exception as e:
             print_error(f"Erro ao salvar arquivo JSON: {e}")

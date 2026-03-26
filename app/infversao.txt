@@ -1,3 +1,6 @@
+1.0.0.5 26/03/2026
+Alterado exportação do arquivo dataset_llm para gerar arquivo FULL e alterado o nome
+
 1.0.0.4 16/03/2026
 Corrigido problema em _get_ids_similares_adicionais quando havia caracteres que geravam sugeira na busca de texto
 
